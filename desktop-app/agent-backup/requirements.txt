@@ -12,10 +12,8 @@ numpy>=1.24.0              # Numerical operations
 # SQLite is built into Python - no extra package needed
 
 # HTTP client (for cloud sync)
-httpx>=0.25.0              # HTTP client for API calls
-
-# Environment variables
-python-dotenv>=1.0.0
+httpx>=0.25.0              # Async HTTP client
+python-dotenv>=1.0.0       # Environment variables
 
 # Email integration (optional)
 google-api-python-client>=2.100.0   # Gmail API

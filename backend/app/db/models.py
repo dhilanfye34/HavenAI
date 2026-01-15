@@ -1,0 +1,86 @@
+"""
+SQLAlchemy Database Models
+
+Defines the database schema for:
+- Users
+- Devices
+- Alerts
+"""
+
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Float, Integer
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+import uuid
+
+from app.db.database import Base
+
+
+def generate_uuid():
+    """Generate a UUID string"""
+    return str(uuid.uuid4())
+
+
+class User(Base):
+    """User account model"""
+    __tablename__ = "users"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    devices = relationship("Device", back_populates="user", cascade="all, delete-orphan")
+    alerts = relationship("Alert", back_populates="user", cascade="all, delete-orphan")
+
+
+class Device(Base):
+    """User device model - represents an installed HavenAI client"""
+    __tablename__ = "devices"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    name = Column(String(255), nullable=False)  # e.g., "MacBook Pro"
+    os_type = Column(String(50), nullable=False)  # e.g., "macos", "windows", "linux"
+    os_version = Column(String(50), nullable=True)  # e.g., "14.0"
+    app_version = Column(String(20), nullable=True)  # e.g., "0.1.0"
+    machine_id = Column(String(255), unique=True, nullable=True)  # Unique hardware ID
+    last_seen = Column(DateTime(timezone=True), server_default=func.now())
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="devices")
+    alerts = relationship("Alert", back_populates="device", cascade="all, delete-orphan")
+
+
+class Alert(Base):
+    """Security alert model"""
+    __tablename__ = "alerts"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    device_id = Column(String, ForeignKey("devices.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    
+    # Alert details
+    type = Column(String(50), nullable=False)  # suspicious_download, phishing_email, etc.
+    severity = Column(String(20), nullable=False)  # low, medium, high, critical
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    details = Column(Text, nullable=True)  # JSON string with additional details
+    risk_score = Column(Float, nullable=True)
+    
+    # Status
+    is_resolved = Column(Boolean, default=False)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    device = relationship("Device", back_populates="alerts")
+    user = relationship("User", back_populates="alerts")

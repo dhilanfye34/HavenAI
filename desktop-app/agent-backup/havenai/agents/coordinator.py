@@ -5,8 +5,10 @@ The master orchestrator that:
 - Starts and manages all other agents
 - Maintains the shared context
 - Correlates findings across agents
-- Sends alerts to the cloud backend
+- Decides final alert severity
 - Communicates with Electron UI
+
+This is the entry point for the agent system.
 """
 
 import time
@@ -21,7 +23,6 @@ from .base import Agent
 from .file_agent import FileAgent
 from .process_agent import ProcessAgent
 from .network_agent import NetworkAgent
-from havenai.api import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,10 @@ class Coordinator:
     - Initialize and manage all agents
     - Maintain shared context for inter-agent communication
     - Process and correlate alerts from all agents
-    - Sync alerts to cloud backend
     - Communicate with Electron via stdin/stdout JSON messages
     """
     
-    def __init__(self, sync_to_cloud: bool = True):
+    def __init__(self):
         # Shared context - all agents can read/write to this
         self.shared_context: Dict[str, Any] = {
             "baseline": {
@@ -55,13 +55,8 @@ class Coordinator:
         self.agents: List[Agent] = []
         self.running = False
         
-        # Cloud sync
-        self.sync_to_cloud = sync_to_cloud
-        self.api_client = get_client() if sync_to_cloud else None
-        
-        # Heartbeat tracking
-        self._last_heartbeat = 0
-        self._heartbeat_interval = 60  # seconds
+        # For communicating with Electron
+        self.outgoing_queue: Queue = Queue()
     
     def initialize_agents(self) -> None:
         """Create all agent instances."""
@@ -110,10 +105,7 @@ class Coordinator:
             correlated = self._correlate_findings()
             if correlated:
                 for alert in correlated:
-                    self._handle_alert(alert)
-            
-            # Send heartbeat periodically
-            self._maybe_send_heartbeat()
+                    self._send_to_electron(alert)
             
             time.sleep(0.5)
     
@@ -122,27 +114,18 @@ class Coordinator:
         while True:
             try:
                 alert = self.alert_queue.get_nowait()
-                self._handle_alert(alert)
+                
+                # Log the alert
+                logger.info(f"Alert from {alert.get('agent')}: {alert.get('type')}")
+                
+                # Send to Electron
+                self._send_to_electron({
+                    "type": "alert",
+                    "data": alert
+                })
+                
             except Empty:
                 break
-    
-    def _handle_alert(self, alert: Dict[str, Any]) -> None:
-        """Handle a single alert - log, sync to cloud, notify UI."""
-        # Log the alert
-        logger.info(f"Alert from {alert.get('agent', 'unknown')}: {alert.get('type')}")
-        
-        # Sync to cloud backend
-        if self.sync_to_cloud and self.api_client and self.api_client.is_authenticated():
-            try:
-                self.api_client.send_alert(alert)
-            except Exception as e:
-                logger.error(f"Failed to sync alert to cloud: {e}")
-        
-        # Send to Electron UI
-        self._send_to_electron({
-            "type": "alert",
-            "data": alert
-        })
     
     def _correlate_findings(self) -> List[Dict[str, Any]]:
         """
@@ -163,11 +146,14 @@ class Coordinator:
         network_findings = self.shared_context.get("NetworkAgent", {}).get("findings", [])
         
         # Correlation 1: File downloaded + Process spawned
+        # If a new file was downloaded and shortly after a new process started,
+        # this could indicate the file was executed
         recent_files = self.shared_context.get("FileAgent", {}).get("recent_files", [])
         recent_spawns = self.shared_context.get("ProcessAgent", {}).get("recent_spawns", [])
         
         for file_finding in file_findings:
             filename = file_finding.get("event", {}).get("filename", "")
+            # Check if a process with similar name spawned
             for spawn in recent_spawns:
                 if filename and spawn and filename.lower().split('.')[0] in spawn.lower():
                     correlated_alerts.append({
@@ -184,8 +170,12 @@ class Coordinator:
                     })
         
         # Correlation 2: Process spawned + Network connection
+        # A new process making network connections could indicate malware phoning home
+        active_ips = self.shared_context.get("NetworkAgent", {}).get("active_ips", [])
+        
         for proc_finding in process_findings:
             proc_name = proc_finding.get("process", {}).get("name", "")
+            # Check if this process has network findings too
             for net_finding in network_findings:
                 if net_finding.get("connection", {}).get("process_name", "").lower() == proc_name.lower():
                     correlated_alerts.append({
@@ -202,17 +192,6 @@ class Coordinator:
                     })
         
         return correlated_alerts
-    
-    def _maybe_send_heartbeat(self) -> None:
-        """Send heartbeat to backend if enough time has passed."""
-        if not self.sync_to_cloud or not self.api_client:
-            return
-        
-        now = time.time()
-        if now - self._last_heartbeat >= self._heartbeat_interval:
-            if self.api_client.is_authenticated():
-                self.api_client.heartbeat()
-            self._last_heartbeat = now
     
     def _send_to_electron(self, message: Dict[str, Any]) -> None:
         """
@@ -235,6 +214,7 @@ class Coordinator:
         msg_type = message.get("type")
         
         if msg_type == "get_status":
+            # Return current status of all agents
             status = {
                 "type": "status",
                 "data": {
@@ -242,7 +222,6 @@ class Coordinator:
                         agent.name: self.shared_context.get(agent.name, {}).get("status", "unknown")
                         for agent in self.agents
                     },
-                    "cloud_connected": self.api_client.is_authenticated() if self.api_client else False,
                     "alert_count": self.alert_queue.qsize()
                 }
             }
@@ -252,20 +231,10 @@ class Coordinator:
             self.stop()
         
         elif msg_type == "update_baseline":
+            # Update baseline from Electron
             baseline_data = message.get("data", {})
             self.shared_context["baseline"].update(baseline_data)
             logger.info("Baseline updated from Electron")
-        
-        elif msg_type == "login":
-            # Handle login from UI
-            email = message.get("email")
-            password = message.get("password")
-            if self.api_client and email and password:
-                try:
-                    self.api_client.login(email, password)
-                    self._send_to_electron({"type": "login_success"})
-                except Exception as e:
-                    self._send_to_electron({"type": "login_error", "error": str(e)})
         
         else:
             logger.warning(f"Unknown message type from Electron: {msg_type}")
@@ -279,7 +248,7 @@ def main():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.FileHandler('havenai-agent.log'),
-            logging.StreamHandler(sys.stderr)
+            logging.StreamHandler(sys.stderr)  # Log to stderr, stdout is for Electron
         ]
     )
     
@@ -288,7 +257,7 @@ def main():
     logger.info("=" * 50)
     
     # Create and start coordinator
-    coordinator = Coordinator(sync_to_cloud=True)
+    coordinator = Coordinator()
     coordinator.initialize_agents()
     
     # Send ready message to Electron
