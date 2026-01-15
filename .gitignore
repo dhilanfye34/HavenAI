@@ -1,0 +1,66 @@
+# HavenAI .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Node.js
+node_modules/
+.next/
+out/
+.npm
+*.tsbuildinfo
+
+# Electron
+dist-electron/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+havenai-agent.log
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Build outputs
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Database
+*.db
+*.sqlite
+
+# Secrets
+*.pem
+*.key

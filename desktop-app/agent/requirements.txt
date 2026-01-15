@@ -1,0 +1,28 @@
+# HavenAI Agent Dependencies
+
+# System monitoring
+psutil>=5.9.0              # Process and system monitoring
+watchdog>=3.0.0            # File system event monitoring
+
+# Machine learning (for anomaly detection)
+scikit-learn>=1.3.0        # Anomaly detection models
+numpy>=1.24.0              # Numerical operations
+
+# Database
+# SQLite is built into Python - no extra package needed
+
+# HTTP client (for cloud sync)
+httpx>=0.25.0              # Async HTTP client
+python-dotenv>=1.0.0       # Environment variables
+
+# Email integration (optional)
+google-api-python-client>=2.100.0   # Gmail API
+google-auth-oauthlib>=1.1.0         # Google OAuth
+
+# Utilities
+pydantic>=2.0.0            # Data validation
+cryptography>=41.0.0       # Encryption for local storage
+
+# Development
+pytest>=7.4.0              # Testing
+black>=23.0.0              # Code formatting

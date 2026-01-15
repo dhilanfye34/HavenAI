@@ -1,0 +1,65 @@
+# HavenAI Docker Compose
+# 
+# This runs the complete backend stack:
+# - Backend API (FastAPI)
+# - Web Application (Next.js)
+# - Database (PostgreSQL)
+#
+# Usage:
+#   docker-compose up -d      # Start all services
+#   docker-compose down       # Stop all services
+#   docker-compose logs -f    # View logs
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: havenai
+      POSTGRES_PASSWORD: havenai_password
+      POSTGRES_DB: havenai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U havenai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://havenai:havenai_password@db:5432/havenai
+      - JWT_SECRET=dev-secret-change-in-production
+      - ENVIRONMENT=development
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Next.js Web Application
+  webapp:
+    build: ./webapp
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - api
+    volumes:
+      - ./webapp:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+
+volumes:
+  postgres_data:

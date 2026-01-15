@@ -1,0 +1,36 @@
+# HavenAI Backend Dependencies
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0      # PostgreSQL driver
+alembic>=1.12.0              # Database migrations
+
+# Authentication
+python-jose[cryptography]>=3.3.0   # JWT tokens
+passlib[bcrypt]>=1.7.0             # Password hashing
+
+# Validation
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+email-validator>=2.0.0
+
+# HTTP client (for external APIs)
+httpx>=0.25.0
+
+# Email sending
+sendgrid>=6.10.0            # Or use boto3 for AWS SES
+
+# Environment
+python-dotenv>=1.0.0
+
+# CORS
+# (included in FastAPI)
+
+# Development
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
