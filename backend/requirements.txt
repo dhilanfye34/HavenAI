@@ -6,13 +6,11 @@ uvicorn[standard]>=0.24.0
 
 # Database
 sqlalchemy>=2.0.0
-# Note: Using SQLite for development (built into Python)
-# For production with PostgreSQL, uncomment:
-# psycopg2-binary>=2.9.0
+psycopg2-binary>=2.9.0      # PostgreSQL driver
 
 # Authentication
 python-jose[cryptography]>=3.3.0   # JWT tokens
-bcrypt>=4.0.0                       # Password hashing (direct, not through passlib)
+bcrypt>=4.0.0                       # Password hashing
 
 # Validation
 pydantic>=2.0.0
@@ -21,7 +19,3 @@ email-validator>=2.0.0
 
 # Environment
 python-dotenv>=1.0.0
-
-# Development
-pytest>=7.4.0
-black>=23.0.0

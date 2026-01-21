@@ -1,0 +1,22 @@
+# Render Blueprint - defines how to deploy the backend
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: havenai-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: havenai-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+
+databases:
+  - name: havenai-db
+    plan: free

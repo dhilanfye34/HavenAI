@@ -27,9 +27,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",      # Local development
-        "https://havenai.ai",         # Production (update with your domain)
-        "https://*.railway.app"       # Railway deployments
+        "http://localhost:3000",      # Local webapp development
+        "http://localhost:3001",      # Local Electron renderer
+        "https://havenai.vercel.app", # Vercel deployment (update with your URL)
+        "https://*.vercel.app",       # Any Vercel preview deployments
     ],
     allow_credentials=True,
     allow_methods=["*"],
