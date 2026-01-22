@@ -29,7 +29,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",           # Local webapp development
         "http://localhost:3001",           # Local Electron renderer
-        "https://havenaiagent.vercel.app", # Your Vercel deployment
+        "https://haven-ai-phi.vercel.app/", # Your Vercel deployment
         "https://*.vercel.app",            # Any Vercel preview deployments
     ],
     allow_credentials=True,
