@@ -26,13 +26,8 @@ app = FastAPI(
 # Configure CORS (allow requests from web dashboard)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",           # Local webapp development
-        "http://localhost:3001",           # Local Electron renderer
-        "https://haven-ai-phi.vercel.app", # Your Vercel deployment
-        "https://*.vercel.app",            # Any Vercel preview deployments
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
