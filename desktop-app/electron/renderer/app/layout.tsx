@@ -1,12 +1,10 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
-
-const inter = Inter({ subsets: ['latin'] });
+import '../../../../webapp/app/globals.css';
 
 export const metadata: Metadata = {
-  title: 'HavenAI',
-  description: 'AI-powered personal cybersecurity agent',
+  title: 'HavenAI - AI-Powered Cybersecurity',
+  description:
+    'Personal cybersecurity agent that learns your behavior and protects you from threats.',
 };
 
 export default function RootLayout({
@@ -16,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className="font-sans antialiased">{children}</body>
     </html>
   );
 }

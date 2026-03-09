@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Shield, Eye, Brain, Lock } from 'lucide-react';
+import { Shield, Eye, Brain, Lock, Download } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -11,7 +11,14 @@ export default function Home() {
             <Shield className="h-8 w-8 text-cyan-400" />
             <span className="text-2xl font-bold">HavenAI</span>
           </div>
-          <div className="space-x-4">
+          <div className="flex items-center space-x-4">
+            <Link
+              href="/download"
+              className="px-4 py-2 text-gray-300 hover:text-white transition inline-flex items-center gap-1.5"
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </Link>
             <Link 
               href="/login" 
               className="px-4 py-2 text-gray-300 hover:text-white transition"
@@ -40,10 +47,11 @@ export default function Home() {
         </p>
         <div className="flex justify-center space-x-4">
           <Link 
-            href="/login"
-            className="px-8 py-3 bg-cyan-500 hover:bg-cyan-600 rounded-lg text-lg font-semibold transition"
+            href="/download"
+            className="px-8 py-3 bg-cyan-500 hover:bg-cyan-600 rounded-lg text-lg font-semibold transition inline-flex items-center gap-2"
           >
-            Start Free
+            <Download className="h-5 w-5" />
+            Download App
           </Link>
           <Link 
             href="#features"
@@ -102,14 +110,23 @@ export default function Home() {
       <section className="container mx-auto px-6 py-20 text-center">
         <h2 className="text-3xl font-bold mb-6">Ready to protect yourself?</h2>
         <p className="text-gray-300 mb-8">
-          Join thousands of users who trust HavenAI with their digital security.
+          Download the desktop app and start your protection in under a minute.
         </p>
-        <Link 
-          href="/login"
-          className="px-8 py-3 bg-cyan-500 hover:bg-cyan-600 rounded-lg text-lg font-semibold transition inline-block"
-        >
-          Get Started Free
-        </Link>
+        <div className="flex justify-center space-x-4">
+          <Link 
+            href="/download"
+            className="px-8 py-3 bg-cyan-500 hover:bg-cyan-600 rounded-lg text-lg font-semibold transition inline-flex items-center gap-2"
+          >
+            <Download className="h-5 w-5" />
+            Download Now
+          </Link>
+          <Link 
+            href="/login"
+            className="px-8 py-3 border border-gray-600 hover:border-gray-500 rounded-lg text-lg transition"
+          >
+            Sign In
+          </Link>
+        </div>
       </section>
 
       {/* Footer */}

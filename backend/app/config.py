@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # Email (optional)
     sendgrid_api_key: Optional[str] = None
     from_email: str = "noreply@havenai.ai"
+
+    # AI provider
+    openai_api_key: Optional[str] = None
     
     # Environment
     environment: str = "development"

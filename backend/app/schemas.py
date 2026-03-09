@@ -5,7 +5,7 @@ Request and response models for the API.
 """
 
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
 from datetime import datetime
 
 
@@ -71,6 +71,7 @@ class DeviceResponse(BaseModel):
     app_version: Optional[str]
     last_seen: datetime
     is_active: bool
+    is_online: bool = False
     created_at: datetime
     
     class Config:
@@ -81,6 +82,15 @@ class DeviceUpdate(BaseModel):
     """Schema for updating device info"""
     name: Optional[str] = None
     is_active: Optional[bool] = None
+
+
+class ProtectionStatusResponse(BaseModel):
+    """Summary of the user's protection state across all devices"""
+    has_devices: bool
+    total_devices: int
+    online_devices: int
+    protection_active: bool
+    devices: List[DeviceResponse]
 
 
 # ============== Alert Schemas ==============
@@ -134,3 +144,26 @@ class AlertStatsResponse(BaseModel):
     last_24h: int
     last_7d: int
     unresolved: int
+
+
+# ============== Chat Schemas ==============
+
+class ChatMessage(BaseModel):
+    """Single message in the chat history."""
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatContextEvent(BaseModel):
+    """Context event injected from dashboard sidebars."""
+    source: str
+    severity: Optional[str] = None
+    timestamp: Optional[str] = None
+    description: str
+
+
+class ChatRequest(BaseModel):
+    """Request payload for streamed chat completions."""
+    messages: List[ChatMessage]
+    context_events: List[ChatContextEvent] = []
+    model: str = "gpt-4o-mini"
