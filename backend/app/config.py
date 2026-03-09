@@ -4,8 +4,14 @@ Configuration management for HavenAI Backend
 Loads settings from environment variables with sensible defaults.
 """
 
-from pydantic_settings import BaseSettings
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+
+
+APP_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = APP_DIR.parent
+REPO_ROOT_DIR = BACKEND_DIR.parent
 
 
 class Settings(BaseSettings):
@@ -30,10 +36,14 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
     debug: bool = True
-    
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+
+    model_config = SettingsConfigDict(
+        env_file=(
+            str(BACKEND_DIR / ".env"),
+            str(REPO_ROOT_DIR / ".env"),
+        ),
+        extra="ignore",
+    )
 
 
 # Global settings instance
