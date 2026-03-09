@@ -16,6 +16,8 @@ services:
         generateValue: true
       - key: ENVIRONMENT
         value: production
+      - key: OPENAI_API_KEY
+        sync: false
 
 databases:
   - name: havenai-db

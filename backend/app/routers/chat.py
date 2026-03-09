@@ -5,11 +5,21 @@ Streams assistant responses from OpenAI for the dashboard chatbot.
 """
 
 import json
+import logging
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from openai import AsyncOpenAI
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+    AuthenticationError,
+    BadRequestError,
+    NotFoundError,
+    RateLimitError,
+)
 
 from app.config import settings
 from app.db.models import User
@@ -17,6 +27,7 @@ from app.dependencies import get_current_user
 from app.schemas import ChatRequest
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You are the central command assistant for HavenAI, an AI-powered cybersecurity platform. "
@@ -51,6 +62,15 @@ def _build_messages(chat_request: ChatRequest) -> list[dict[str, str]]:
     return messages
 
 
+def _candidate_models(requested_model: str) -> list[str]:
+    candidates = [requested_model, "gpt-4o-mini", "gpt-4o"]
+    unique: list[str] = []
+    for candidate in candidates:
+        if candidate not in unique:
+            unique.append(candidate)
+    return unique
+
+
 @router.post("/stream")
 async def stream_chat(
     chat_request: ChatRequest,
@@ -72,13 +92,38 @@ async def stream_chat(
     messages = _build_messages(chat_request)
 
     async def event_stream() -> AsyncGenerator[str, None]:
+        models_to_try = _candidate_models(model_name)
         try:
-            stream = await client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                stream=True,
-                temperature=0.35,
-            )
+            stream = None
+            for candidate_model in models_to_try:
+                try:
+                    stream = await client.chat.completions.create(
+                        model=candidate_model,
+                        messages=messages,
+                        stream=True,
+                        temperature=0.35,
+                    )
+                    break
+                except (NotFoundError, BadRequestError) as model_error:
+                    error_text = str(model_error).lower()
+                    is_model_issue = (
+                        "model" in error_text
+                        and (
+                            "not found" in error_text
+                            or "does not exist" in error_text
+                            or "unsupported" in error_text
+                        )
+                    )
+                    if is_model_issue and candidate_model != models_to_try[-1]:
+                        logger.warning(
+                            "Model %s unavailable, retrying with fallback.",
+                            candidate_model,
+                        )
+                        continue
+                    raise
+
+            if stream is None:
+                raise RuntimeError("No available model for chat streaming.")
 
             async for chunk in stream:
                 if not chunk.choices:
@@ -88,10 +133,22 @@ async def stream_chat(
                     yield f"data: {json.dumps({'type': 'token', 'content': delta})}\n\n"
 
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
-        except Exception:
-            yield (
-                f"data: {json.dumps({'type': 'error', 'message': 'Chat stream failed'})}\n\n"
-            )
+        except AuthenticationError:
+            logger.exception("OpenAI authentication failed")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'OpenAI authentication failed on backend.'})}\n\n"
+        except RateLimitError:
+            logger.exception("OpenAI rate limited")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'OpenAI rate limit hit. Please retry in a moment.'})}\n\n"
+        except (APIConnectionError, APITimeoutError):
+            logger.exception("OpenAI network/timeout error")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'OpenAI connection timed out or failed.'})}\n\n"
+        except APIStatusError as status_error:
+            logger.exception("OpenAI API status error")
+            yield f"data: {json.dumps({'type': 'error', 'message': f'OpenAI API error ({status_error.status_code}).'})}\n\n"
+        except Exception as error:
+            logger.exception("Chat stream failed")
+            message = str(error).strip() or "Chat stream failed."
+            yield f"data: {json.dumps({'type': 'error', 'message': message[:300]})}\n\n"
 
     return StreamingResponse(
         event_stream(),
