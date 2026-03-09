@@ -38,10 +38,7 @@ class Settings(BaseSettings):
     debug: bool = True
 
     model_config = SettingsConfigDict(
-        env_file=(
-            str(BACKEND_DIR / ".env"),
-            str(REPO_ROOT_DIR / ".env"),
-        ),
+        env_file=str(REPO_ROOT_DIR / ".env"),
         extra="ignore",
     )
 
