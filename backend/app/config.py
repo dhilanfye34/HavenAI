@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Database
-    database_url: str = "sqlite:///./havenai.db"  # Default to SQLite for easy dev
+    database_url: str = "postgresql://postgres:postgres@localhost:5432/havenai"
     
     # JWT Authentication
     jwt_secret: str = "dev-secret-change-this-in-production"

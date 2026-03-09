@@ -7,7 +7,7 @@ Defines the database schema for:
 - Alerts
 """
 
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Float, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Float, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -28,8 +28,8 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=True)
-    is_active = Column(Boolean, default=True)
-    is_verified = Column(Boolean, default=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    is_verified = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
@@ -50,7 +50,7 @@ class Device(Base):
     app_version = Column(String(20), nullable=True)  # e.g., "0.1.0"
     machine_id = Column(String(255), unique=True, nullable=True)  # Unique hardware ID
     last_seen = Column(DateTime(timezone=True), server_default=func.now())
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
@@ -75,7 +75,7 @@ class Alert(Base):
     risk_score = Column(Float, nullable=True)
     
     # Status
-    is_resolved = Column(Boolean, default=False)
+    is_resolved = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     
     # Timestamps

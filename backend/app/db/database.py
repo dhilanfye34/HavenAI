@@ -3,17 +3,12 @@ Database setup and SQLAlchemy configuration
 """
 
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.config import settings
 
-# Create engine - use SQLite for development, PostgreSQL for production
-engine = create_engine(
-    settings.database_url,
-    # SQLite needs this, PostgreSQL ignores it
-    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {}
-)
+# Create engine using DATABASE_URL (PostgreSQL on Render/local env)
+engine = create_engine(settings.database_url)
 
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
