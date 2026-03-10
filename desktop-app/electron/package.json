@@ -6,9 +6,9 @@
   "author": "HavenAI Team",
   "license": "MIT",
   "scripts": {
-    "dev": "concurrently \"npm run dev:electron\" \"npm run dev:renderer\"",
-    "dev:electron": "tsc && electron .",
-    "dev:renderer": "cd renderer && npm run dev",
+    "dev": "bash -lc 'PORT=$(node ./scripts/find-renderer-port.js 3001 3002 3003 3004 3005) && echo \"Using renderer port: $PORT\" && concurrently \"RENDERER_PORT=$PORT npm run dev:electron\" \"RENDERER_PORT=$PORT npm run dev:renderer\"'",
+    "dev:electron": "tsc && env -u ELECTRON_RUN_AS_NODE electron .",
+    "dev:renderer": "cd renderer && next dev -p ${RENDERER_PORT:-3001}",
     "build": "npm run build:renderer && npm run build:electron",
     "build:electron": "tsc",
     "build:renderer": "cd renderer && npm run build",

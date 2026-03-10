@@ -4,7 +4,7 @@ Pydantic Schemas
 Request and response models for the API.
 """
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List, Any, Literal
 from datetime import datetime
 
@@ -167,3 +167,47 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     context_events: List[ChatContextEvent] = []
     model: str = "gpt-4o-mini"
+
+
+# ============== Setup Schemas ==============
+
+class SetupPreferencesResponse(BaseModel):
+    """Persisted setup preferences and gating metadata."""
+    file_monitoring_enabled: bool
+    process_monitoring_enabled: bool
+    network_monitoring_enabled: bool
+    email_enabled: bool
+    sms_enabled: bool
+    voice_call_enabled: bool
+    sms_phone: Optional[str] = None
+    voice_phone: Optional[str] = None
+    desktop_available: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SetupPreferencesUpdate(BaseModel):
+    """Patch payload for updating user setup preferences."""
+    file_monitoring_enabled: Optional[bool] = None
+    process_monitoring_enabled: Optional[bool] = None
+    network_monitoring_enabled: Optional[bool] = None
+    email_enabled: Optional[bool] = None
+    sms_enabled: Optional[bool] = None
+    voice_call_enabled: Optional[bool] = None
+    sms_phone: Optional[str] = None
+    voice_phone: Optional[str] = None
+
+    @field_validator("sms_phone", "voice_phone")
+    @classmethod
+    def normalize_phone(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if normalized == "":
+            return None
+        if len(normalized) < 7:
+            raise ValueError("Phone number looks too short.")
+        return normalized

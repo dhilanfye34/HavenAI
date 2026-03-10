@@ -36,6 +36,12 @@ class User(Base):
     # Relationships
     devices = relationship("Device", back_populates="user", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="user", cascade="all, delete-orphan")
+    setup_preferences = relationship(
+        "UserSetupPreferences",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
 
 class Device(Base):
@@ -84,3 +90,36 @@ class Alert(Base):
     # Relationships
     device = relationship("Device", back_populates="alerts")
     user = relationship("User", back_populates="alerts")
+
+
+class UserSetupPreferences(Base):
+    """Per-user setup state for monitors and cloud alert channels."""
+    __tablename__ = "user_setup_preferences"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+
+    # Desktop-dependent monitors
+    file_monitoring_enabled = Column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    process_monitoring_enabled = Column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    network_monitoring_enabled = Column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+
+    # Cloud channels
+    email_enabled = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    sms_enabled = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    voice_call_enabled = Column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    sms_phone = Column(String(32), nullable=True)
+    voice_phone = Column(String(32), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="setup_preferences")

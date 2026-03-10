@@ -10,10 +10,12 @@ import { HealthScore } from './components/HealthScore';
 import { QuickStats } from './components/QuickStats';
 import { Recommendations } from './components/Recommendations';
 import { ResourceMonitor } from './components/ResourceMonitor';
+import { SetupPanel } from './components/SetupPanel';
 import { TopBar } from './components/TopBar';
 import { useAgentStatus } from './hooks/useAgentStatus';
 import { useAlerts } from './hooks/useAlerts';
 import { useChat } from './hooks/useChat';
+import { useSetupPreferences } from './hooks/useSetupPreferences';
 import { mockRecommendations, mockSecurityStats } from './services/mockAgents';
 
 type LocalUser = {
@@ -27,9 +29,20 @@ export default function DashboardPage() {
   const [isReady, setIsReady] = useState(false);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
 
   const { agents } = useAgentStatus();
   const { alerts, counts, latestAlertId } = useAlerts();
+  const {
+    preferences,
+    protectionStatus,
+    loading: setupLoading,
+    saving: setupSaving,
+    error: setupError,
+    saveError: setupSaveError,
+    saveSuccess: setupSaveSuccess,
+    save: saveSetupPreferences,
+  } = useSetupPreferences(token);
   const {
     messages,
     isResponding,
@@ -49,6 +62,7 @@ export default function DashboardPage() {
       router.push('/login');
       return;
     }
+    setToken(token);
 
     try {
       setUser(JSON.parse(userData));
@@ -97,6 +111,21 @@ export default function DashboardPage() {
       <main className="mx-auto max-w-[1600px] px-4 py-4 md:px-6">
         <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
           <aside className={`${leftOpen ? 'block' : 'hidden'} xl:block`}>
+            <SetupPanel
+              preferences={preferences}
+              loading={setupLoading}
+              saving={setupSaving}
+              error={setupError}
+              saveError={setupSaveError}
+              saveSuccess={
+                setupSaveSuccess ||
+                (protectionStatus?.has_devices
+                  ? 'Desktop connected. Monitoring modules available.'
+                  : null)
+              }
+              recentAlerts={alerts}
+              onSave={saveSetupPreferences}
+            />
             <AgentPanel agents={agents} />
             <AlertFeed
               alerts={alerts}

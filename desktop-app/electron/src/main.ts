@@ -24,6 +24,7 @@ let isQuitting = false;
 
 // Check if we're in development mode
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const rendererDevPort = process.env.RENDERER_PORT || '3001';
 
 /**
  * Create the main application window
@@ -50,7 +51,7 @@ function createWindow(): void {
   // Load the renderer
   if (isDev) {
     // In development, load from Next.js dev server
-    mainWindow.loadURL('http://localhost:3001');
+    mainWindow.loadURL(`http://localhost:${rendererDevPort}`);
     mainWindow.webContents.openDevTools();
   } else {
     // In production, load the built files
