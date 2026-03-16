@@ -21,6 +21,8 @@ from .base import Agent
 from .file_agent import FileAgent
 from .process_agent import ProcessAgent
 from .network_agent import NetworkAgent
+from .email_inbox_agent import EmailInboxAgent
+from .message_agent import MessageAgent
 from havenai.api import get_client
 
 logger = logging.getLogger(__name__)
@@ -72,6 +74,8 @@ class Coordinator:
             FileAgent(self.shared_context, self.alert_queue),
             ProcessAgent(self.shared_context, self.alert_queue),
             NetworkAgent(self.shared_context, self.alert_queue),
+            EmailInboxAgent(self.shared_context, self.alert_queue),
+            MessageAgent(self.shared_context, self.alert_queue),
         ]
         
         logger.info(f"Initialized {len(self.agents)} agents")
@@ -130,6 +134,15 @@ class Coordinator:
         """Handle a single alert - log, sync to cloud, notify UI."""
         # Log the alert
         logger.info(f"Alert from {alert.get('agent', 'unknown')}: {alert.get('type')}")
+
+        # Forward alert to message channel router agent (if present).
+        for agent in self.agents:
+            enqueue_fn = getattr(agent, "enqueue_alert", None)
+            if callable(enqueue_fn):
+                try:
+                    enqueue_fn(alert)
+                except Exception as e:
+                    logger.debug(f"Failed to enqueue alert for {agent.name}: {e}")
         
         # Sync to cloud backend
         if self.sync_to_cloud and self.api_client and self.api_client.is_authenticated():
