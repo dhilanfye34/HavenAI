@@ -10,6 +10,7 @@
 
 import { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage } from 'electron';
 import * as path from 'path';
+import * as os from 'os';
 import { PythonBridge } from './python-bridge';
 import Store from 'electron-store';
 
@@ -25,6 +26,22 @@ let isQuitting = false;
 // Check if we're in development mode
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const rendererDevPort = process.env.RENDERER_PORT || '3001';
+
+function getDeviceMetadata() {
+  const platformMap: Record<string, string> = {
+    darwin: 'macos',
+    win32: 'windows',
+    linux: 'linux',
+  };
+
+  return {
+    name: os.hostname(),
+    os_type: platformMap[process.platform] || process.platform,
+    os_version: os.release(),
+    app_version: app.getVersion(),
+    machine_id: `${os.hostname()}-${os.arch()}`,
+  };
+}
 
 /**
  * Create the main application window
@@ -183,6 +200,20 @@ function initPythonBridge(): void {
   pythonBridge.on('ready', () => {
     console.log('Python agent is ready');
     mainWindow?.webContents.send('agent-status', { status: 'running' });
+    pythonBridge?.send({ type: 'get_status' });
+
+    // If credentials were persisted, immediately hydrate Python session.
+    const accessToken = store.get('accessToken') as string | undefined;
+    if (accessToken) {
+      pythonBridge?.send({
+        type: 'sync_auth',
+        access_token: accessToken,
+        refresh_token: store.get('refreshToken') as string | undefined,
+        user: store.get('user') || {},
+        device_id: store.get('deviceId') as string | undefined,
+        device: getDeviceMetadata(),
+      });
+    }
   });
 
   pythonBridge.on('alert', (alert: any) => {
@@ -197,6 +228,42 @@ function initPythonBridge(): void {
 
     // Send to renderer
     mainWindow?.webContents.send('new-alert', alert);
+  });
+
+  pythonBridge.on('status', (status: any) => {
+    if (status?.device_id) {
+      store.set('deviceId', status.device_id);
+    }
+    mainWindow?.webContents.send('agent-status', status);
+  });
+
+  pythonBridge.on('login-success', (data: any) => {
+    if (data?.device_id) {
+      store.set('deviceId', data.device_id);
+    }
+    mainWindow?.webContents.send('agent-auth', { status: 'success', ...data });
+  });
+
+  pythonBridge.on('login-error', (error: string) => {
+    mainWindow?.webContents.send('agent-auth', { status: 'error', error });
+  });
+
+  pythonBridge.on('auth-synced', (data: any) => {
+    if (data?.device_id) {
+      store.set('deviceId', data.device_id);
+    }
+    mainWindow?.webContents.send('agent-auth', { status: 'synced', ...data });
+  });
+
+  pythonBridge.on('preferences-applied', (data: any) => {
+    mainWindow?.webContents.send('agent-preferences', data);
+  });
+
+  pythonBridge.on('device-registered', (data: any) => {
+    if (data?.device_id) {
+      store.set('deviceId', data.device_id);
+    }
+    mainWindow?.webContents.send('agent-device', data);
   });
 
   pythonBridge.on('error', (error: string) => {
@@ -265,6 +332,49 @@ ipcMain.handle('clear-credentials', () => {
 // Send message to Python agent
 ipcMain.handle('send-to-agent', (_, message) => {
   pythonBridge?.send(message);
+  return true;
+});
+
+ipcMain.handle('agent-login', (_, payload) => {
+  pythonBridge?.send({
+    type: 'login',
+    email: payload?.email,
+    password: payload?.password,
+    device: getDeviceMetadata(),
+  });
+  return true;
+});
+
+ipcMain.handle('sync-agent-auth', (_, payload) => {
+  if (payload?.accessToken) {
+    store.set('accessToken', payload.accessToken);
+  }
+  if (payload?.refreshToken) {
+    store.set('refreshToken', payload.refreshToken);
+  }
+  if (payload?.user) {
+    store.set('user', payload.user);
+  }
+
+  pythonBridge?.send({
+    type: 'sync_auth',
+    access_token: payload?.accessToken,
+    refresh_token: payload?.refreshToken,
+    user: payload?.user || {},
+    device_id: (store.get('deviceId') as string | undefined),
+    device: getDeviceMetadata(),
+  });
+  return true;
+});
+
+ipcMain.handle('update-agent-preferences', (_, payload) => {
+  pythonBridge?.send({ type: 'update_preferences', data: payload || {} });
+  return true;
+});
+
+ipcMain.handle('agent-logout', () => {
+  pythonBridge?.send({ type: 'logout' });
+  store.delete('deviceId');
   return true;
 });
 

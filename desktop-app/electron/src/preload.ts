@@ -14,6 +14,18 @@ contextBridge.exposeInMainWorld('havenai', {
   startAgent: () => ipcRenderer.invoke('start-agent'),
   stopAgent: () => ipcRenderer.invoke('stop-agent'),
   sendToAgent: (message: object) => ipcRenderer.invoke('send-to-agent', message),
+  loginAgent: (payload: { email: string; password: string }) => ipcRenderer.invoke('agent-login', payload),
+  syncAgentAuth: (payload: {
+    accessToken: string;
+    refreshToken?: string;
+    user?: any;
+  }) => ipcRenderer.invoke('sync-agent-auth', payload),
+  updateAgentPreferences: (payload: {
+    file_monitoring_enabled?: boolean;
+    process_monitoring_enabled?: boolean;
+    network_monitoring_enabled?: boolean;
+  }) => ipcRenderer.invoke('update-agent-preferences', payload),
+  logoutAgent: () => ipcRenderer.invoke('agent-logout'),
 
   // Credentials
   getCredentials: () => ipcRenderer.invoke('get-credentials'),
@@ -26,6 +38,15 @@ contextBridge.exposeInMainWorld('havenai', {
   },
   onAgentStatus: (callback: (status: any) => void) => {
     ipcRenderer.on('agent-status', (_, status) => callback(status));
+  },
+  onAgentAuth: (callback: (auth: any) => void) => {
+    ipcRenderer.on('agent-auth', (_, auth) => callback(auth));
+  },
+  onAgentPreferences: (callback: (prefs: any) => void) => {
+    ipcRenderer.on('agent-preferences', (_, prefs) => callback(prefs));
+  },
+  onAgentDevice: (callback: (device: any) => void) => {
+    ipcRenderer.on('agent-device', (_, device) => callback(device));
   },
 
   // Remove listeners
@@ -46,6 +67,18 @@ declare global {
       startAgent: () => Promise<boolean>;
       stopAgent: () => Promise<boolean>;
       sendToAgent: (message: object) => Promise<boolean>;
+      loginAgent: (payload: { email: string; password: string }) => Promise<boolean>;
+      syncAgentAuth: (payload: {
+        accessToken: string;
+        refreshToken?: string;
+        user?: any;
+      }) => Promise<boolean>;
+      updateAgentPreferences: (payload: {
+        file_monitoring_enabled?: boolean;
+        process_monitoring_enabled?: boolean;
+        network_monitoring_enabled?: boolean;
+      }) => Promise<boolean>;
+      logoutAgent: () => Promise<boolean>;
       getCredentials: () => Promise<{
         accessToken?: string;
         refreshToken?: string;
@@ -56,6 +89,9 @@ declare global {
       clearCredentials: () => Promise<boolean>;
       onNewAlert: (callback: (alert: any) => void) => void;
       onAgentStatus: (callback: (status: any) => void) => void;
+      onAgentAuth: (callback: (auth: any) => void) => void;
+      onAgentPreferences: (callback: (prefs: any) => void) => void;
+      onAgentDevice: (callback: (device: any) => void) => void;
       removeAllListeners: (channel: string) => void;
       platform: string;
       isPackaged: boolean;
