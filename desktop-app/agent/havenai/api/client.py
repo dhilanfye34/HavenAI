@@ -80,6 +80,35 @@ class APIClient:
     def is_authenticated(self) -> bool:
         """Check if we have valid credentials."""
         return self.access_token is not None and self.device_id is not None
+
+    def has_tokens(self) -> bool:
+        """Check whether auth tokens are present (with or without a device id)."""
+        return self.access_token is not None
+
+    def set_session(
+        self,
+        access_token: str,
+        refresh_token: Optional[str] = None,
+        user_id: Optional[str] = None,
+        device_id: Optional[str] = None,
+    ) -> None:
+        """Hydrate client auth/session data from desktop app state."""
+        self.access_token = access_token
+        if refresh_token is not None:
+            self.refresh_token = refresh_token
+        if user_id is not None:
+            self.user_id = user_id
+        if device_id is not None:
+            self.device_id = device_id
+        self._save_config()
+
+    def clear_session(self) -> None:
+        """Clear all locally persisted credentials."""
+        self.access_token = None
+        self.refresh_token = None
+        self.device_id = None
+        self.user_id = None
+        self._save_config()
     
     def register(self, email: str, password: str, full_name: str = None) -> Dict[str, Any]:
         """
@@ -143,7 +172,14 @@ class APIClient:
         logger.info(f"Logged in as {email}")
         return data
     
-    def register_device(self, name: str, os_type: str, os_version: str = None, app_version: str = "0.1.0") -> Dict[str, Any]:
+    def register_device(
+        self,
+        name: str,
+        os_type: str,
+        os_version: str = None,
+        app_version: str = "0.1.0",
+        machine_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Register this device with the backend.
         
@@ -163,7 +199,8 @@ class APIClient:
                 "name": name,
                 "os_type": os_type,
                 "os_version": os_version,
-                "app_version": app_version
+                "app_version": app_version,
+                "machine_id": machine_id,
             }
         )
         response.raise_for_status()
@@ -215,13 +252,25 @@ class APIClient:
             logger.error(f"Failed to send alert: {e.response.status_code} - {e.response.text}")
             # Try to refresh token if unauthorized
             if e.response.status_code == 401:
-                self._refresh_access_token()
+                if self.refresh_access_token():
+                    try:
+                        retry = self.client.post(
+                            f"{self.base_url}/alerts",
+                            headers=self._get_headers(),
+                            json=api_alert
+                        )
+                        retry.raise_for_status()
+                        data = retry.json()
+                        logger.info(f"Alert sent to cloud after token refresh: {data['id']}")
+                        return data
+                    except Exception as retry_error:
+                        logger.error(f"Alert retry after refresh failed: {retry_error}")
             return None
         except Exception as e:
             logger.error(f"Failed to send alert: {e}")
             return None
     
-    def _refresh_access_token(self) -> bool:
+    def refresh_access_token(self) -> bool:
         """Refresh the access token using refresh token."""
         if not self.refresh_token:
             return False
@@ -243,6 +292,35 @@ class APIClient:
         except Exception as e:
             logger.error(f"Failed to refresh token: {e}")
             return False
+
+    def get_setup_preferences(self) -> Optional[Dict[str, Any]]:
+        """Fetch monitoring and channel setup preferences for the authenticated user."""
+        if not self.has_tokens():
+            return None
+
+        try:
+            response = self.client.get(
+                f"{self.base_url}/setup/preferences",
+                headers=self._get_headers(),
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401 and self.refresh_access_token():
+                try:
+                    retry = self.client.get(
+                        f"{self.base_url}/setup/preferences",
+                        headers=self._get_headers(),
+                    )
+                    retry.raise_for_status()
+                    return retry.json()
+                except Exception as retry_error:
+                    logger.error(f"Failed to fetch setup preferences after refresh: {retry_error}")
+            logger.error(f"Failed to fetch setup preferences: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to fetch setup preferences: {e}")
+            return None
     
     def heartbeat(self) -> bool:
         """Send heartbeat to update device last_seen."""
@@ -256,6 +334,19 @@ class APIClient:
             )
             response.raise_for_status()
             return True
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401 and self.refresh_access_token():
+                try:
+                    retry = self.client.post(
+                        f"{self.base_url}/devices/{self.device_id}/heartbeat",
+                        headers=self._get_headers()
+                    )
+                    retry.raise_for_status()
+                    return True
+                except Exception as retry_error:
+                    logger.debug(f"Heartbeat retry failed: {retry_error}")
+            logger.debug(f"Heartbeat failed with status error: {e}")
+            return False
         except Exception as e:
             logger.debug(f"Heartbeat failed: {e}")
             return False

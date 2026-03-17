@@ -203,6 +203,21 @@ export class PythonBridge extends EventEmitter {
       case 'status':
         this.emit('status', data);
         break;
+      case 'login_success':
+        this.emit('login-success', data);
+        break;
+      case 'login_error':
+        this.emit('login-error', message.error || 'Login failed');
+        break;
+      case 'auth_synced':
+        this.emit('auth-synced', data);
+        break;
+      case 'preferences_applied':
+        this.emit('preferences-applied', data);
+        break;
+      case 'device_registered':
+        this.emit('device-registered', data);
+        break;
       default:
         console.log('Unknown message type from Python:', type);
     }
