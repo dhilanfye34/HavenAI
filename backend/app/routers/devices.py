@@ -7,7 +7,7 @@ Handles device registration and management.
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.db.database import get_db
 from app.db.models import User, Device
@@ -23,7 +23,11 @@ def _is_device_online(device: Device) -> bool:
     """A device is 'online' if its last heartbeat was within the threshold."""
     if not device.last_seen:
         return False
-    return datetime.utcnow() - device.last_seen < ONLINE_THRESHOLD
+    now_utc = datetime.now(timezone.utc)
+    last_seen = device.last_seen
+    if last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=timezone.utc)
+    return now_utc - last_seen < ONLINE_THRESHOLD
 
 
 def _device_to_response(device: Device) -> DeviceResponse:
@@ -76,7 +80,7 @@ async def register_device(
             existing.name = device_data.name
             existing.os_version = device_data.os_version
             existing.app_version = device_data.app_version
-            existing.last_seen = datetime.utcnow()
+            existing.last_seen = datetime.now(timezone.utc)
             existing.is_active = True
             db.commit()
             db.refresh(existing)
@@ -211,7 +215,7 @@ async def device_heartbeat(
             detail="Device not found"
         )
     
-    device.last_seen = datetime.utcnow()
+    device.last_seen = datetime.now(timezone.utc)
     db.commit()
     db.refresh(device)
     

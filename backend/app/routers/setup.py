@@ -51,6 +51,8 @@ def _to_response(
         email_enabled=preferences.email_enabled,
         sms_enabled=preferences.sms_enabled,
         voice_call_enabled=preferences.voice_call_enabled,
+        sms_min_severity=preferences.sms_min_severity,
+        voice_call_min_severity=preferences.voice_call_min_severity,
         sms_phone=preferences.sms_phone,
         voice_phone=preferences.voice_phone,
         desktop_available=desktop_available,

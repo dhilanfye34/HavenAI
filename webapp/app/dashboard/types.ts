@@ -68,6 +68,8 @@ export interface SetupPreferences {
   email_enabled: boolean;
   sms_enabled: boolean;
   voice_call_enabled: boolean;
+  sms_min_severity: 'low' | 'medium' | 'high' | 'critical';
+  voice_call_min_severity: 'low' | 'medium' | 'high' | 'critical';
   sms_phone: string | null;
   voice_phone: string | null;
   desktop_available: boolean;
@@ -82,6 +84,8 @@ export interface SetupPreferencesUpdate {
   email_enabled?: boolean;
   sms_enabled?: boolean;
   voice_call_enabled?: boolean;
+  sms_min_severity?: 'low' | 'medium' | 'high' | 'critical';
+  voice_call_min_severity?: 'low' | 'medium' | 'high' | 'critical';
   sms_phone?: string | null;
   voice_phone?: string | null;
 }

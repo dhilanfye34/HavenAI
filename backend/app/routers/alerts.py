@@ -12,9 +12,10 @@ from datetime import datetime, timedelta
 import json
 
 from app.db.database import get_db
-from app.db.models import User, Device, Alert
+from app.db.models import User, Device, Alert, UserSetupPreferences
 from app.schemas import AlertCreate, AlertResponse, AlertUpdate, AlertListResponse, AlertStatsResponse
 from app.dependencies import get_current_user
+from app.services.notifications import NotificationService, get_notification_service
 
 router = APIRouter()
 
@@ -23,7 +24,8 @@ router = APIRouter()
 async def create_alert(
     alert_data: AlertCreate,
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    notification_service: NotificationService = Depends(get_notification_service),
 ):
     """
     Create a new security alert.
@@ -57,8 +59,38 @@ async def create_alert(
     db.add(alert)
     db.commit()
     db.refresh(alert)
-    
-    # TODO: Send notification (email/SMS) for high severity alerts
+
+    preferences = (
+        db.query(UserSetupPreferences)
+        .filter(UserSetupPreferences.user_id == user.id)
+        .first()
+    )
+    try:
+        metadata = notification_service.dispatch_for_alert(
+            alert=alert,
+            user=user,
+            preferences=preferences,
+        )
+        alert.notification_metadata = json.dumps(metadata)
+        db.commit()
+        db.refresh(alert)
+    except Exception:  # noqa: BLE001
+        # Never fail alert creation due to downstream provider issues.
+        metadata = {
+            "severity": alert.severity,
+            "results": [
+                {
+                    "channel": "all",
+                    "attempted": False,
+                    "success": False,
+                    "status": "failed",
+                    "detail": "Notification dispatch raised an exception.",
+                }
+            ],
+        }
+        alert.notification_metadata = json.dumps(metadata)
+        db.commit()
+        db.refresh(alert)
     
     return alert
 
