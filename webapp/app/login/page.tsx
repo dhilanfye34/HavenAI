@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Shield, Loader2 } from 'lucide-react';
+import { Shield, Loader2, ArrowLeft } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -12,7 +12,6 @@ export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -24,7 +23,7 @@ export default function LoginPage() {
 
     try {
       const endpoint = isLogin ? '/auth/login' : '/auth/register';
-      const body = isLogin 
+      const body = isLogin
         ? { email, password }
         : { email, password, full_name: fullName };
 
@@ -40,13 +39,9 @@ export default function LoginPage() {
       }
 
       const data = await response.json();
-      
-      // Save tokens to localStorage
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
       localStorage.setItem('user', JSON.stringify(data.user));
-
-      // Redirect to dashboard
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message);
@@ -56,24 +51,29 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-2">
-            <Shield className="h-10 w-10 text-cyan-400" />
-            <span className="text-3xl font-bold text-white">HavenAI</span>
+    <div className="relative flex min-h-screen items-center justify-center px-4">
+      <div className="bg-gradient-mesh-animated absolute inset-0 -z-10" />
+      <div className="bg-dot-pattern absolute inset-0 -z-10 opacity-30" />
+
+      <div className="w-full max-w-md">
+        <div className="mb-8 text-center">
+          <Link href="/" className="group mb-4 inline-flex items-center gap-2 text-sm text-gray-500 transition hover:text-gray-300">
+            <ArrowLeft className="h-4 w-4" />
+            Back to home
           </Link>
+          <div className="mt-4 flex items-center justify-center gap-2.5">
+            <Shield className="h-9 w-9 text-cyan-400" />
+            <span className="text-2xl font-bold tracking-tight text-white">HavenAI</span>
+          </div>
         </div>
 
-        {/* Card */}
-        <div className="bg-gray-800 rounded-2xl p-8 shadow-xl">
-          <h2 className="text-2xl font-bold text-white text-center mb-6">
+        <div className="glass-card p-8">
+          <h2 className="mb-6 text-center text-xl font-bold text-white">
             {isLogin ? 'Welcome back' : 'Create your account'}
           </h2>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded-lg mb-6">
+            <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
               {error}
             </div>
           )}
@@ -81,21 +81,21 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="mb-1.5 block text-sm font-medium text-gray-400">
                   Full Name
                 </label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-cyan-500"
+                  className="glass-input"
                   placeholder="John Doe"
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+              <label className="mb-1.5 block text-sm font-medium text-gray-400">
                 Email
               </label>
               <input
@@ -103,13 +103,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-cyan-500"
+                className="glass-input"
                 placeholder="you@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+              <label className="mb-1.5 block text-sm font-medium text-gray-400">
                 Password
               </label>
               <input
@@ -117,7 +117,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-cyan-500"
+                className="glass-input"
                 placeholder="••••••••"
               />
             </div>
@@ -125,24 +125,26 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-500/50 text-white font-semibold rounded-lg transition flex items-center justify-center"
+              className="btn-primary mt-2 w-full disabled:opacity-50"
             >
               {loading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
+              ) : isLogin ? (
+                'Sign In'
               ) : (
-                isLogin ? 'Sign In' : 'Create Account'
+                'Create Account'
               )}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-cyan-400 hover:text-cyan-300 text-sm"
+              onClick={() => { setIsLogin(!isLogin); setError(''); }}
+              className="text-sm text-cyan-400 transition hover:text-cyan-300"
             >
-              {isLogin 
-                ? "Don't have an account? Sign up" 
-                : "Already have an account? Sign in"}
+              {isLogin
+                ? "Don't have an account? Sign up"
+                : 'Already have an account? Sign in'}
             </button>
           </div>
         </div>

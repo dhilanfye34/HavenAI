@@ -3,34 +3,111 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-rgb: 17, 24, 39;
+  --haven-bg: #0a0a0f;
+  --haven-surface: rgba(255, 255, 255, 0.03);
+  --haven-border: rgba(255, 255, 255, 0.08);
+  --haven-cyan: #22d3ee;
+  --haven-violet: #8b5cf6;
+  --haven-glow-cyan: rgba(34, 211, 238, 0.15);
+  --haven-glow-violet: rgba(139, 92, 246, 0.15);
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
+  background: var(--haven-bg);
+  color: #e2e8f0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
+/* Animated gradient mesh background */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
-::-webkit-scrollbar-track {
-  background: #1f2937;
+.bg-gradient-mesh {
+  background: 
+    radial-gradient(ellipse at 20% 50%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(6, 182, 212, 0.05) 0%, transparent 50%),
+    var(--haven-bg);
 }
 
-::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 4px;
+.bg-gradient-mesh-animated {
+  background: 
+    radial-gradient(ellipse at 20% 50%, rgba(34, 211, 238, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(6, 182, 212, 0.06) 0%, transparent 50%),
+    linear-gradient(135deg, #0a0a0f 0%, #0f0a1a 50%, #0a0a0f 100%);
+  background-size: 200% 200%;
+  animation: gradient-shift 15s ease infinite;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+.bg-dot-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
-/* Disable text selection for app-like feel */
+@layer components {
+  .glass-card {
+    @apply rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl;
+  }
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:border-white/[0.15] hover:bg-white/[0.05] hover:shadow-[0_0_30px_rgba(34,211,238,0.08)];
+  }
+  .glass-input {
+    @apply w-full rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 text-white placeholder-gray-500 outline-none transition-all duration-300 focus:border-cyan-400/50 focus:shadow-[0_0_0_3px_rgba(34,211,238,0.1)] focus:bg-white/[0.08];
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 font-semibold text-white transition-all duration-300 hover:shadow-[0_0_25px_rgba(34,211,238,0.3)] hover:brightness-110 active:scale-[0.98];
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.05] px-6 py-3 font-medium text-gray-300 transition-all duration-300 hover:border-white/[0.2] hover:bg-white/[0.08] hover:text-white active:scale-[0.98];
+  }
+  .glow-cyan {
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.15), 0 0 60px rgba(34, 211, 238, 0.05);
+  }
+  .glow-violet {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.15), 0 0 60px rgba(139, 92, 246, 0.05);
+  }
+}
+
+/* Entrance animations */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(34, 211, 238, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.4); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #22d3ee 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* Desktop-specific: Disable text selection for app-like feel */
 .no-select {
   -webkit-user-select: none;
   user-select: none;

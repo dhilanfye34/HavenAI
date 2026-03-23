@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import '../../../../webapp/app/globals.css';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: 'HavenAI - AI-Powered Cybersecurity',
@@ -13,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body className="font-sans antialiased">{children}</body>
     </html>
   );

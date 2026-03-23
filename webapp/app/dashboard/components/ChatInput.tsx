@@ -25,7 +25,7 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
   };
 
   return (
-    <form onSubmit={submit} className="border-t border-gray-700 bg-gray-900/80 p-3">
+    <form onSubmit={submit} className="border-t border-white/[0.06] bg-white/[0.02] p-3">
       <div className="flex items-end gap-2">
         <textarea
           value={value}
@@ -33,12 +33,12 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
           onKeyDown={onKeyDown}
           rows={2}
           placeholder="Ask about your security posture, alerts, or recommendations..."
-          className="max-h-40 min-h-[52px] w-full resize-y rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-500"
+          className="max-h-40 min-h-[52px] w-full resize-y rounded-xl border border-white/[0.08] bg-white/[0.05] px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none transition-all duration-300 focus:border-cyan-400/40 focus:shadow-[0_0_0_3px_rgba(34,211,238,0.08)]"
         />
         <button
           type="submit"
           disabled={disabled || !value.trim()}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500 text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:bg-cyan-700/40"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white transition-all duration-300 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)] disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Send message"
         >
           <SendHorizontal className="h-4 w-4" />

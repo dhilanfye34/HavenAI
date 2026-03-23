@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-
+import { Sparkles } from 'lucide-react';
 import { ChatConnectionStatus, ChatMessage, ChatContextEvent } from '../types';
 import { ChatInput } from './ChatInput';
 import { ChatMessage as MessageBubble } from './ChatMessage';
@@ -14,7 +14,7 @@ interface ChatPanelProps {
 }
 
 const indicatorColor: Record<ChatConnectionStatus, string> = {
-  connected: 'bg-green-400',
+  connected: 'bg-emerald-400',
   degraded: 'bg-amber-400',
   offline: 'bg-red-500',
 };
@@ -37,19 +37,22 @@ export function ChatPanel({
   }, [messages, isResponding]);
 
   return (
-    <section className="flex h-[calc(100vh-11rem)] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-900/80">
-      <div className="border-b border-gray-700 bg-gray-800/80 px-4 py-3">
+    <section className="flex h-[calc(100vh-11rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl">
+      <div className="border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/[0.06] to-violet-500/[0.04] px-4 py-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-200">
-              Security Assistant
-            </h2>
-            <p className="text-xs text-gray-400">
-              Ask plain-English questions about alerts and system posture.
-            </p>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-cyan-400" />
+            <div>
+              <h2 className="text-sm font-semibold text-white">
+                Security Assistant
+              </h2>
+              <p className="text-[11px] text-gray-500">
+                Ask about alerts and system posture.
+              </p>
+            </div>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-gray-700 bg-gray-900 px-2.5 py-1 text-xs text-gray-300">
-            <span className={`h-2 w-2 rounded-full ${indicatorColor[connectionStatus]}`} />
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] text-gray-400">
+            <span className={`h-1.5 w-1.5 rounded-full ${indicatorColor[connectionStatus]}`} />
             {connectionLabel}
           </div>
         </div>
@@ -60,23 +63,23 @@ export function ChatPanel({
           <MessageBubble key={message.id} message={message} />
         ))}
         {isResponding && (
-          <div className="inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-300">
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-300 [animation-delay:-0.3s]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-300 [animation-delay:-0.15s]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-300" />
-            Assistant is typing...
+          <div className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-gray-400">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-400 [animation-delay:-0.3s]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-400 [animation-delay:-0.15s]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-400" />
+            Thinking...
           </div>
         )}
       </div>
 
       {contextEvents.length > 0 && (
-        <div className="max-h-24 overflow-y-auto border-t border-gray-700 bg-gray-900/95 px-4 py-2">
-          <p className="mb-1 text-[11px] uppercase tracking-wide text-gray-500">
-            Context Queue ({contextEvents.length})
+        <div className="max-h-24 overflow-y-auto border-t border-white/[0.06] bg-white/[0.02] px-4 py-2">
+          <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-600">
+            Context ({contextEvents.length})
           </p>
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {contextEvents.slice(0, 3).map((event, index) => (
-              <p key={`${event.timestamp}-${index}`} className="truncate text-xs text-gray-400">
+              <p key={`${event.timestamp}-${index}`} className="truncate text-[11px] text-gray-500">
                 {event.source}: {event.description}
               </p>
             ))}

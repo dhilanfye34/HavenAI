@@ -7,12 +7,12 @@ interface AgentPanelProps {
 
 export function AgentPanel({ agents }: AgentPanelProps) {
   return (
-    <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-3">
-      <div className="mb-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+    <section className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-4">
+      <div className="mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
           Agent Status
         </h2>
-        <p className="text-xs text-gray-500">Live heartbeat and latest summaries.</p>
+        <p className="mt-0.5 text-[11px] text-gray-600">Live heartbeat and latest summaries.</p>
       </div>
       <div className="space-y-2">
         {agents.map((agent) => (

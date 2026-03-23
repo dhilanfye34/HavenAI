@@ -233,34 +233,40 @@ export default function DashboardPage() {
 
   if (!isReady) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-950">
-        <p className="text-sm text-gray-400">Loading command center...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
+          <p className="text-sm text-gray-500">Loading command center...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-[#0a0a0f] text-white">
       <TopBar
         userLabel={user?.full_name || user?.email || 'Security Operator'}
         notificationCount={notificationCount}
         onLogout={handleLogout}
       />
 
-      <nav className="border-b border-gray-800 bg-gray-900/80">
-        <div className="mx-auto flex max-w-[1600px] items-center gap-1 px-4 py-2 md:px-6">
+      <nav className="border-b border-white/[0.06] bg-[#0a0a0f]/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1600px] items-center gap-1 px-4 py-1.5 md:px-6">
           {TAB_META.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition ${
+              className={`relative inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 ${
                 tab === id
-                  ? 'bg-cyan-500/15 text-cyan-300'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                  ? 'text-cyan-300'
+                  : 'text-gray-500 hover:text-gray-300'
               }`}
             >
               <Icon className="h-4 w-4" />
               {label}
+              {tab === id && (
+                <span className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500" />
+              )}
             </button>
           ))}
         </div>
@@ -272,41 +278,41 @@ export default function DashboardPage() {
             <div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(360px,1fr)]">
               <div className="space-y-3">
                 <section className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-                  <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-3">
+                  <section className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                        <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                           Live Triage
                         </h2>
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-0.5 text-[11px] text-gray-600">
                           Prioritized alerts and runtime signal.
                         </p>
                       </div>
-                      <span className="rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-300">
+                      <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] text-gray-400">
                         {alerts.length} events
                       </span>
                     </div>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                      <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-xs">
-                        <p className="text-red-200">Critical</p>
-                        <p className="mt-0.5 text-lg font-semibold text-red-100">{counts.critical}</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      <div className="rounded-xl border border-red-500/20 bg-red-500/[0.06] p-3">
+                        <p className="text-[11px] text-red-300">Critical</p>
+                        <p className="mt-1 text-xl font-bold text-red-200">{counts.critical}</p>
                       </div>
-                      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
-                        <p className="text-amber-200">Warning</p>
-                        <p className="mt-0.5 text-lg font-semibold text-amber-100">{counts.warning}</p>
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-3">
+                        <p className="text-[11px] text-amber-300">Warning</p>
+                        <p className="mt-1 text-xl font-bold text-amber-200">{counts.warning}</p>
                       </div>
-                      <div className="rounded-lg border border-blue-500/40 bg-blue-500/10 p-2 text-xs">
-                        <p className="text-blue-200">Info</p>
-                        <p className="mt-0.5 text-lg font-semibold text-blue-100">{counts.info}</p>
+                      <div className="rounded-xl border border-blue-500/20 bg-blue-500/[0.06] p-3">
+                        <p className="text-[11px] text-blue-300">Info</p>
+                        <p className="mt-1 text-xl font-bold text-blue-200">{counts.info}</p>
                       </div>
                     </div>
-                    <div className="mt-2 rounded-lg border border-gray-700 bg-gray-800/60 p-2 text-xs">
-                      <p className="text-gray-400">Latest event</p>
-                      <p className="mt-0.5 line-clamp-1 text-sm text-gray-100">
+                    <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                      <p className="text-[11px] text-gray-600">Latest event</p>
+                      <p className="mt-1 line-clamp-1 text-sm text-gray-200">
                         {latestAlert ? latestAlert.description : 'No incoming alerts yet.'}
                       </p>
                       {latestAlert && (
-                        <p className="mt-0.5 text-gray-500">
+                        <p className="mt-1 text-[11px] text-gray-600">
                           {latestAlert.source} &bull; {new Date(latestAlert.timestamp).toLocaleTimeString()}
                         </p>
                       )}

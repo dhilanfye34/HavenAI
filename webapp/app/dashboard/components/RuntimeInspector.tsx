@@ -16,6 +16,12 @@ function formatTime(timestamp?: number) {
   return new Date(timestamp * 1000).toLocaleTimeString();
 }
 
+const kindBadge: Record<string, string> = {
+  file: 'border-blue-500/20 bg-blue-500/[0.08] text-blue-300',
+  process: 'border-violet-500/20 bg-violet-500/[0.08] text-violet-300',
+  network: 'border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-300',
+};
+
 export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorControl }: RuntimeInspectorProps) {
   const havenai = typeof window !== 'undefined' ? (window as any).havenai : null;
   const details = runtimeStatus?.module_details;
@@ -70,16 +76,16 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
   }, [timelineEvents]);
 
   return (
-    <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-3">
-      <div className="mb-2 flex items-center justify-between">
+    <section className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-4">
+      <div className="mb-3 flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-300">Runtime Inspector</h2>
-          <p className="text-xs text-gray-500">Live file/process/network activity on this device.</p>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Runtime Inspector</h2>
+          <p className="mt-0.5 text-[11px] text-gray-600">Live file/process/network activity on this device.</p>
         </div>
         <button
           type="button"
           onClick={refreshStatus}
-          className="inline-flex items-center gap-1 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-300 hover:text-white"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-gray-400 transition-all duration-300 hover:border-white/[0.15] hover:text-white"
         >
           <RefreshCcw className="h-3 w-3" />
           Refresh
@@ -87,17 +93,23 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
       </div>
 
       {isDesktopRuntime && monitorControl && (
-        <div className="mb-2 rounded-lg border border-gray-700 bg-gray-800/70 p-2 text-xs text-gray-300">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Monitor Lifecycle</p>
-          <div className="grid gap-1 sm:grid-cols-3">
+        <div className="mb-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Monitor Lifecycle</p>
+          <div className="grid gap-2 sm:grid-cols-3">
             {(['file', 'process', 'network'] as const).map((module) => (
-              <div key={module} className="rounded border border-gray-700 bg-gray-900/70 p-2">
-                <p className="font-medium capitalize text-gray-100">{module}</p>
-                <p className="text-gray-400">Desired: {monitorControl.desired[module] ? 'On' : 'Off'}</p>
-                <p className="text-gray-400">Granted: {monitorControl.grants[module] ? 'Yes' : 'No'}</p>
-                <p className="text-gray-400">State: {monitorControl.state[module]}</p>
+              <div key={module} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                <p className="text-sm font-medium capitalize text-white">{module}</p>
+                <div className="mt-1.5 space-y-0.5 text-[11px] text-gray-500">
+                  <p>Desired: <span className="text-gray-300">{monitorControl.desired[module] ? 'On' : 'Off'}</span></p>
+                  <p>Granted: <span className="text-gray-300">{monitorControl.grants[module] ? 'Yes' : 'No'}</span></p>
+                  <p>State: <span className={
+                    monitorControl.state[module] === 'running' ? 'text-emerald-400' :
+                    monitorControl.state[module] === 'blocked' ? 'text-red-400' :
+                    monitorControl.state[module] === 'pending_permission' ? 'text-amber-400' : 'text-gray-400'
+                  }>{monitorControl.state[module]}</span></p>
+                </div>
                 {monitorControl.blockers[module]?.[0] && (
-                  <p className="mt-1 text-red-300">{monitorControl.blockers[module][0]}</p>
+                  <p className="mt-1.5 text-[11px] text-red-300">{monitorControl.blockers[module][0]}</p>
                 )}
               </div>
             ))}
@@ -106,22 +118,22 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
       )}
 
       {isDesktopRuntime && permissionHints?.maybe_blocked && (
-        <div className="mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
-          <div className="mb-1 inline-flex items-center gap-1 font-medium">
+        <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-3 text-xs text-amber-300">
+          <div className="mb-1.5 inline-flex items-center gap-1.5 font-medium">
             <AlertTriangle className="h-3.5 w-3.5" />
             Permissions likely blocking telemetry
           </div>
-          <p className="mb-2">
+          <p className="mb-2 text-amber-200/80">
             Monitoring is enabled but no events were observed yet. Grant privacy permissions and retry.
           </p>
           <button
             type="button"
             onClick={openPermissionSettings}
-            className="rounded border border-amber-400/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-100 hover:bg-amber-500/20"
+            className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200 transition hover:bg-amber-500/20"
           >
             Open macOS Privacy Settings
           </button>
-          <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-amber-100/90">
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-amber-200/70">
             {(permissionHints?.items || []).map((item) => (
               <li key={item.id}>
                 <span className="font-medium">{item.label}:</span> {item.description}
@@ -132,19 +144,20 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
       )}
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
+        {/* Live Event Timeline */}
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Live Event Timeline</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Live Event Timeline</p>
             <div className="flex items-center gap-1">
               {(['all', 'file', 'process', 'network'] as StreamFilter[]).map((filter) => (
                 <button
                   key={filter}
                   type="button"
                   onClick={() => setStreamFilter(filter)}
-                  className={`rounded border px-2 py-1 text-[11px] transition ${
+                  className={`rounded-lg border px-2 py-1 text-[11px] font-medium transition-all duration-300 ${
                     streamFilter === filter
-                      ? 'border-cyan-400/70 bg-cyan-500/10 text-cyan-200'
-                      : 'border-gray-700 bg-gray-900/70 text-gray-400 hover:text-gray-200'
+                      ? 'border-cyan-400/30 bg-cyan-500/10 text-cyan-300'
+                      : 'border-white/[0.06] bg-white/[0.02] text-gray-500 hover:text-gray-300'
                   }`}
                 >
                   {filter}
@@ -152,158 +165,145 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
               ))}
             </div>
           </div>
-          <div ref={timelineRef} className="max-h-[30rem] space-y-1 overflow-y-auto text-xs">
-            {timelineEvents.map((event) => (
-              <div key={event.id} className="rounded border border-gray-700 bg-gray-900/70 p-2">
+          <div ref={timelineRef} className="max-h-[30rem] space-y-1.5 overflow-y-auto">
+            {timelineEvents.map((event, idx) => (
+              <div
+                key={event.id}
+                className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5 transition-all duration-300 hover:border-white/[0.12]"
+                style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
+              >
                 <div className="mb-0.5 flex items-center justify-between gap-2">
-                  <span
-                    className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
-                      event.kind === 'file'
-                        ? 'bg-blue-500/20 text-blue-200'
-                        : event.kind === 'process'
-                        ? 'bg-violet-500/20 text-violet-200'
-                        : 'bg-emerald-500/20 text-emerald-200'
-                    }`}
-                  >
+                  <span className={`rounded-md border px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${kindBadge[event.kind]}`}>
                     {event.kind}
                   </span>
-                  <span className="text-[11px] text-gray-500">{formatTime(event.timestamp)}</span>
+                  <span className="text-[11px] text-gray-600">{formatTime(event.timestamp)}</span>
                 </div>
-                <p className="truncate font-medium text-gray-100">{event.title}</p>
-                <p className="truncate text-gray-400">{event.subtitle}</p>
+                <p className="truncate text-sm font-medium text-gray-200">{event.title}</p>
+                <p className="truncate text-[11px] text-gray-500">{event.subtitle}</p>
               </div>
             ))}
-            {timelineEvents.length === 0 && <p className="text-gray-500">No events for this filter yet.</p>}
+            {timelineEvents.length === 0 && <p className="py-4 text-center text-xs text-gray-600">No events for this filter yet.</p>}
           </div>
         </div>
 
+        {/* Right column panels */}
         <div className="space-y-3">
-          <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Active Process Snapshot</p>
-            <div className="max-h-36 overflow-y-auto text-xs text-gray-300">
-              <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-700 pb-1 text-[11px] text-gray-500">
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Active Process Snapshot</p>
+            <div className="max-h-36 overflow-y-auto text-xs">
+              <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-white/[0.06] pb-1.5 text-[11px] text-gray-600">
                 <span>Process</span>
                 <span>PID</span>
               </div>
               {(details?.process.active_processes || []).slice(0, 16).map((proc, idx) => (
-                <div key={`${proc.pid}-${idx}`} className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-800 py-1">
-                  <span className="truncate text-gray-100">{proc.name || 'unknown'}</span>
-                  <span className="text-gray-400">{proc.pid ?? 'n/a'}</span>
+                <div key={`${proc.pid}-${idx}`} className="grid grid-cols-[1fr_auto] gap-2 border-b border-white/[0.04] py-1.5">
+                  <span className="truncate text-gray-300">{proc.name || 'unknown'}</span>
+                  <span className="text-gray-500">{proc.pid ?? 'n/a'}</span>
                 </div>
               ))}
               {(!details?.process.active_processes || details.process.active_processes.length === 0) && (
-                <p className="py-2 text-gray-500">No active process snapshot yet.</p>
+                <p className="py-3 text-center text-gray-600">No active process snapshot yet.</p>
               )}
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Active Network Connections</p>
-            <div className="max-h-36 overflow-y-auto text-xs text-gray-300">
-              <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-700 pb-1 text-[11px] text-gray-500">
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Active Network Connections</p>
+            <div className="max-h-36 overflow-y-auto text-xs">
+              <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-white/[0.06] pb-1.5 text-[11px] text-gray-600">
                 <span>Destination</span>
                 <span>Port</span>
               </div>
               {(details?.network.active_connections || []).slice(0, 16).map((conn, idx) => (
-                <div
-                  key={`${conn.pid}-${conn.remote_ip}-${conn.remote_port}-${idx}`}
-                  className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-800 py-1"
-                >
-                  <span className="truncate text-gray-100">{conn.hostname || conn.remote_ip || 'unknown'}</span>
-                  <span className="text-gray-400">{conn.remote_port ?? 'n/a'}</span>
+                <div key={`${conn.pid}-${conn.remote_ip}-${conn.remote_port}-${idx}`} className="grid grid-cols-[1fr_auto] gap-2 border-b border-white/[0.04] py-1.5">
+                  <span className="truncate text-gray-300">{conn.hostname || conn.remote_ip || 'unknown'}</span>
+                  <span className="text-gray-500">{conn.remote_port ?? 'n/a'}</span>
                 </div>
               ))}
               {(!details?.network.active_connections || details.network.active_connections.length === 0) && (
-                <p className="py-2 text-gray-500">No active network snapshot yet.</p>
+                <p className="py-3 text-center text-gray-600">No active network snapshot yet.</p>
               )}
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Top Live Processes</p>
-            <div className="max-h-28 overflow-y-auto text-xs text-gray-300">
-              <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-gray-700 pb-1 text-[11px] text-gray-500">
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Top Live Processes</p>
+            <div className="max-h-28 overflow-y-auto text-xs">
+              <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-white/[0.06] pb-1.5 text-[11px] text-gray-600">
                 <span>Process</span>
                 <span>CPU%</span>
                 <span>Mem%</span>
               </div>
               {(details?.process.top_processes || []).slice(0, 8).map((proc, idx) => (
-                <div key={`${proc.pid}-${idx}`} className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-gray-800 py-1">
-                  <span className="truncate text-gray-100">{proc.name || 'unknown'}</span>
-                  <span>{(proc.cpu_percent || 0).toFixed(1)}</span>
-                  <span>{(proc.memory_percent || 0).toFixed(1)}</span>
+                <div key={`${proc.pid}-${idx}`} className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-white/[0.04] py-1.5">
+                  <span className="truncate text-gray-300">{proc.name || 'unknown'}</span>
+                  <span className="text-gray-500">{(proc.cpu_percent || 0).toFixed(1)}</span>
+                  <span className="text-gray-500">{(proc.memory_percent || 0).toFixed(1)}</span>
                 </div>
               ))}
               {(!details?.process.top_processes || details.process.top_processes.length === 0) && (
-                <p className="py-2 text-gray-500">No process telemetry yet.</p>
+                <p className="py-3 text-center text-gray-600">No process telemetry yet.</p>
               )}
             </div>
           </div>
         </div>
       </div>
 
+      {/* Bottom activity panels */}
       <div className="mt-3 grid gap-3 md:grid-cols-3">
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">File Activity</p>
-          <p className="mb-1 text-xs text-gray-400">Events observed: {details?.file.event_count ?? 0}</p>
-          <div className="max-h-36 space-y-1 overflow-y-auto text-xs text-gray-300">
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500">File Activity</p>
+          <p className="mb-2 text-[11px] text-gray-600">Events observed: {details?.file.event_count ?? 0}</p>
+          <div className="max-h-36 space-y-1.5 overflow-y-auto">
             {(details?.file.recent_events || []).slice(-8).reverse().map((event, idx) => (
-              <div key={`${event.path}-${idx}`} className="rounded border border-gray-700 bg-gray-900/70 p-2">
-                <p className="truncate font-medium text-gray-100">{event.filename || event.path || 'Unknown file'}</p>
-                <p className="truncate text-gray-400">
-                  {event.type || 'event'} · {event.extension || 'n/a'} · {event.size || 0} bytes
-                </p>
+              <div key={`${event.path}-${idx}`} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5">
+                <p className="truncate text-sm font-medium text-gray-200">{event.filename || event.path || 'Unknown file'}</p>
+                <p className="truncate text-[11px] text-gray-500">{event.type || 'event'} · {event.extension || 'n/a'} · {event.size || 0} bytes</p>
               </div>
             ))}
             {(!details?.file.recent_events || details.file.recent_events.length === 0) && (
-              <p className="text-gray-500">No file events yet.</p>
+              <p className="py-2 text-center text-xs text-gray-600">No file events yet.</p>
             )}
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Process Activity</p>
-          <p className="mb-1 text-xs text-gray-400">New process events: {details?.process.event_count ?? 0}</p>
-          <div className="max-h-36 space-y-1 overflow-y-auto text-xs text-gray-300">
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Process Activity</p>
+          <p className="mb-2 text-[11px] text-gray-600">New process events: {details?.process.event_count ?? 0}</p>
+          <div className="max-h-36 space-y-1.5 overflow-y-auto">
             {(details?.process.recent_events || []).slice(-8).reverse().map((event, idx) => (
-              <div key={`${event.pid}-${idx}`} className="rounded border border-gray-700 bg-gray-900/70 p-2">
-                <p className="truncate font-medium text-gray-100">
-                  {event.name || 'unknown'} <span className="text-gray-500">PID {event.pid ?? 'n/a'}</span>
-                </p>
-                <p className="truncate text-gray-400">Parent: {event.parent_name || 'unknown'}</p>
+              <div key={`${event.pid}-${idx}`} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5">
+                <p className="truncate text-sm font-medium text-gray-200">{event.name || 'unknown'} <span className="text-gray-600">PID {event.pid ?? 'n/a'}</span></p>
+                <p className="truncate text-[11px] text-gray-500">Parent: {event.parent_name || 'unknown'}</p>
               </div>
             ))}
             {(!details?.process.recent_events || details.process.recent_events.length === 0) && (
-              <p className="text-gray-500">No process spawn events yet.</p>
+              <p className="py-2 text-center text-xs text-gray-600">No process spawn events yet.</p>
             )}
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Network Activity</p>
-          <p className="mb-1 text-xs text-gray-400">New network events: {details?.network.event_count ?? 0}</p>
-          <div className="max-h-36 space-y-1 overflow-y-auto text-xs text-gray-300">
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Network Activity</p>
+          <p className="mb-2 text-[11px] text-gray-600">New network events: {details?.network.event_count ?? 0}</p>
+          <div className="max-h-36 space-y-1.5 overflow-y-auto">
             {(details?.network.recent_events || []).slice(-8).reverse().map((event, idx) => (
-              <div key={`${event.pid}-${event.remote_ip}-${idx}`} className="rounded border border-gray-700 bg-gray-900/70 p-2">
-                <p className="truncate font-medium text-gray-100">
-                  {event.process_name || 'unknown'} <span className="text-gray-500">PID {event.pid ?? 'n/a'}</span>
-                </p>
-                <p className="truncate text-gray-400">
-                  {event.hostname || event.remote_ip || 'unknown host'}:{event.remote_port ?? 'n/a'}
-                </p>
+              <div key={`${event.pid}-${event.remote_ip}-${idx}`} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5">
+                <p className="truncate text-sm font-medium text-gray-200">{event.process_name || 'unknown'} <span className="text-gray-600">PID {event.pid ?? 'n/a'}</span></p>
+                <p className="truncate text-[11px] text-gray-500">{event.hostname || event.remote_ip || 'unknown host'}:{event.remote_port ?? 'n/a'}</p>
               </div>
             ))}
             {(!details?.network.recent_events || details.network.recent_events.length === 0) && (
-              <p className="text-gray-500">No network events yet.</p>
+              <p className="py-2 text-center text-xs text-gray-600">No network events yet.</p>
             )}
           </div>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500">
-        <ShieldCheck className="h-3.5 w-3.5" />
-        Live status updates are pulled from the desktop agent in real time.
-        <Activity className="ml-1 h-3.5 w-3.5" />
+      <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-600">
+        <ShieldCheck className="h-3.5 w-3.5 text-cyan-400/50" />
+        Live status updates pulled from the desktop agent in real time.
+        <Activity className="ml-1 h-3.5 w-3.5 text-cyan-400/50" />
       </div>
     </section>
   );

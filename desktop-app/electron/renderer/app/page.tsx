@@ -28,8 +28,11 @@ export default function HomePage() {
 
   if (hasToken === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-950 text-gray-300">
-        Loading...
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
+          <p className="text-sm text-gray-500">Loading...</p>
+        </div>
       </div>
     );
   }

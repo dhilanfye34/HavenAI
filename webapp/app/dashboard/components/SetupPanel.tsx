@@ -50,12 +50,12 @@ function ToggleRow({
 }: ToggleRowProps) {
   const statusTone =
     status === 'running'
-      ? 'text-green-300'
+      ? 'text-emerald-400'
       : status === 'blocked'
-      ? 'text-red-300'
+      ? 'text-red-400'
       : status === 'pending_permission'
-      ? 'text-amber-300'
-      : 'text-gray-400';
+      ? 'text-amber-400'
+      : 'text-gray-500';
   const statusLabel =
     status === 'running'
       ? 'Running'
@@ -66,24 +66,24 @@ function ToggleRow({
       : 'Off';
 
   return (
-    <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-3">
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-medium text-gray-100">{label}</p>
-          <p className="text-xs text-gray-400">{description}</p>
+          <p className="text-sm font-medium text-white">{label}</p>
+          <p className="text-xs text-gray-500">{description}</p>
           {!!status && <p className={`mt-1 text-xs font-medium ${statusTone}`}>Status: {statusLabel}</p>}
           {locked && (
-            <p className="mt-1 text-xs text-amber-300">
+            <p className="mt-1 text-xs text-amber-400">
               Requires desktop app installation and permissions.
             </p>
           )}
           {!!blockers?.length && (
-            <p className="mt-1 text-xs text-red-300">{blockers[0]}</p>
+            <p className="mt-1 text-xs text-red-400">{blockers[0]}</p>
           )}
           {onViewDetails && (
             <button
               onClick={onViewDetails}
-              className="mt-2 text-xs text-cyan-300 transition hover:text-cyan-200"
+              className="mt-2 text-xs text-cyan-400 transition hover:text-cyan-300"
               type="button"
             >
               View recent events
@@ -95,7 +95,7 @@ function ToggleRow({
           onClick={() => onToggle(!checked)}
           disabled={disabled || locked}
           className={`relative inline-flex h-6 w-11 items-center rounded-full p-0.5 transition ${
-            checked ? 'bg-cyan-500' : 'bg-gray-600'
+            checked ? 'bg-gradient-to-r from-cyan-500 to-blue-600' : 'bg-white/[0.1]'
           } ${disabled || locked ? 'cursor-not-allowed opacity-60' : ''}`}
           aria-pressed={checked}
         >
@@ -154,7 +154,7 @@ export function SetupPanel({
 
   if (loading) {
     return (
-      <section className="mb-4 rounded-2xl border border-gray-700 bg-gray-900/70 p-4">
+      <section className="mb-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-4">
         <p className="text-sm text-gray-400">Loading setup...</p>
       </section>
     );
@@ -162,8 +162,8 @@ export function SetupPanel({
 
   if (!preferences) {
     return (
-      <section className="mb-4 rounded-2xl border border-gray-700 bg-gray-900/70 p-4">
-        <p className="text-sm text-red-300">{error || 'Could not load setup state.'}</p>
+      <section className="mb-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-4">
+        <p className="text-sm text-red-400">{error || 'Could not load setup state.'}</p>
       </section>
     );
   }
@@ -231,16 +231,16 @@ export function SetupPanel({
   };
 
   return (
-    <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-3">
+    <section className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-4">
       <div className="mb-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
           Monitor Controls
         </h2>
-        <p className="text-xs text-gray-500">Fast access to monitor toggles and permission state.</p>
+        <p className="text-[11px] text-gray-600">Fast access to monitor toggles and permission state.</p>
       </div>
 
       {desktopLocked && (
-        <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+        <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-3 text-xs text-amber-300">
           <div className="mb-1 inline-flex items-center gap-1 font-medium">
             <Lock className="h-3.5 w-3.5" />
             Desktop app required
@@ -255,7 +255,7 @@ export function SetupPanel({
       )}
 
       {isDesktopRuntime && (
-        <div className="mb-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 p-2 text-xs text-cyan-200">
+        <div className="mb-3 rounded-xl border border-cyan-500/20 bg-cyan-500/[0.06] p-3 text-xs text-cyan-300">
           <div className="mb-1 inline-flex items-center gap-1 font-medium">
             <Activity className="h-3.5 w-3.5" />
             Desktop runtime connected
@@ -265,7 +265,7 @@ export function SetupPanel({
       )}
 
       <div className="space-y-1.5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
           Desktop Monitoring
         </p>
         <ToggleRow
@@ -283,14 +283,14 @@ export function SetupPanel({
             <button
               type="button"
               onClick={() => openPermissionsSettings('file')}
-              className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-200 hover:bg-amber-500/20"
+              className="rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-2.5 py-1.5 text-xs text-amber-300 transition hover:bg-amber-500/10"
             >
               Open privacy settings
             </button>
             <button
               type="button"
               onClick={() => allowAccessAndRetry('file')}
-              className="rounded border border-cyan-500/50 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-200 hover:bg-cyan-500/20"
+              className="rounded-lg border border-cyan-400/20 bg-cyan-500/[0.06] px-2.5 py-1.5 text-xs text-cyan-300 transition hover:bg-cyan-500/10"
             >
               Allow access and retry
             </button>
@@ -311,14 +311,14 @@ export function SetupPanel({
             <button
               type="button"
               onClick={() => openPermissionsSettings('process')}
-              className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-200 hover:bg-amber-500/20"
+              className="rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-2.5 py-1.5 text-xs text-amber-300 transition hover:bg-amber-500/10"
             >
               Open privacy settings
             </button>
             <button
               type="button"
               onClick={() => allowAccessAndRetry('process')}
-              className="rounded border border-cyan-500/50 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-200 hover:bg-cyan-500/20"
+              className="rounded-lg border border-cyan-400/20 bg-cyan-500/[0.06] px-2.5 py-1.5 text-xs text-cyan-300 transition hover:bg-cyan-500/10"
             >
               Allow access and retry
             </button>
@@ -339,14 +339,14 @@ export function SetupPanel({
             <button
               type="button"
               onClick={() => openPermissionsSettings('network')}
-              className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-200 hover:bg-amber-500/20"
+              className="rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-2.5 py-1.5 text-xs text-amber-300 transition hover:bg-amber-500/10"
             >
               Open privacy settings
             </button>
             <button
               type="button"
               onClick={() => allowAccessAndRetry('network')}
-              className="rounded border border-cyan-500/50 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-200 hover:bg-cyan-500/20"
+              className="rounded-lg border border-cyan-400/20 bg-cyan-500/[0.06] px-2.5 py-1.5 text-xs text-cyan-300 transition hover:bg-cyan-500/10"
             >
               Allow access and retry
             </button>
@@ -354,20 +354,20 @@ export function SetupPanel({
         )}
       </div>
 
-      <div className="mt-2 rounded-lg border border-gray-700 bg-gray-800/60">
+      <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02]">
         <button
           type="button"
           onClick={() => setAdvancedOpen((value) => !value)}
-          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-gray-300"
+          className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-xs text-gray-400"
         >
           <span>
             Advanced alert channels
-            <span className="ml-2 text-[11px] text-gray-500">{enabledCloudChannels}/3 enabled</span>
+            <span className="ml-2 text-[11px] text-gray-600">{enabledCloudChannels}/3 enabled</span>
           </span>
           {advancedOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
         </button>
         {advancedOpen && (
-          <div className="space-y-2 border-t border-gray-700 px-2 pb-2 pt-2">
+          <div className="space-y-2 border-t border-white/[0.06] px-3 pb-3 pt-3">
             <ToggleRow
               label="Email Alerts"
               description="Receive alerts by account email."
@@ -402,7 +402,7 @@ export function SetupPanel({
                   placeholder="+1 305 555 1234"
                   onChange={(event) => setSmsPhoneDraft(event.target.value)}
                   onBlur={validateAndSaveSmsPhone}
-                  className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
+                  className="glass-input !text-xs !py-2"
                 />
                 <select
                   value={preferences.sms_min_severity}
@@ -415,7 +415,7 @@ export function SetupPanel({
                         | 'critical',
                     })
                   }
-                  className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
+                  className="glass-input !text-xs !py-2"
                 >
                   <option value="low">SMS threshold: low+</option>
                   <option value="medium">SMS threshold: medium+</option>
@@ -452,7 +452,7 @@ export function SetupPanel({
                   placeholder="+1 305 555 5678"
                   onChange={(event) => setVoicePhoneDraft(event.target.value)}
                   onBlur={validateAndSaveVoicePhone}
-                  className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
+                  className="glass-input !text-xs !py-2"
                 />
                 <select
                   value={preferences.voice_call_min_severity}
@@ -465,7 +465,7 @@ export function SetupPanel({
                         | 'critical',
                     })
                   }
-                  className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
+                  className="glass-input !text-xs !py-2"
                 >
                   <option value="low">Call threshold: low+</option>
                   <option value="medium">Call threshold: medium+</option>
@@ -479,15 +479,15 @@ export function SetupPanel({
         )}
       </div>
 
-      <div className="mt-3 flex items-center gap-2 text-xs">
-        <span className="inline-flex items-center gap-1 text-gray-400">
+      <div className="mt-4 flex items-center gap-2 text-xs">
+        <span className="inline-flex items-center gap-1 text-gray-500">
           <Save className="h-3.5 w-3.5" />
           {saving ? 'Saving...' : saveSuccess || 'Changes autosave'}
         </span>
-        {saveError && <span className="text-red-300">{saveError}</span>}
-        {error && <span className="text-red-300">{error}</span>}
+        {saveError && <span className="text-red-400">{saveError}</span>}
+        {error && <span className="text-red-400">{error}</span>}
       </div>
-      <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-gray-500">
+      <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-gray-600">
         <Activity className="h-3 w-3" />
         Agent details are visible in the alert feed and assistant context.
       </div>
