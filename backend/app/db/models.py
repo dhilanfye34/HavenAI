@@ -78,6 +78,7 @@ class Alert(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     details = Column(Text, nullable=True)  # JSON string with additional details
+    notification_metadata = Column(Text, nullable=True)  # JSON string with notification results
     risk_score = Column(Float, nullable=True)
     
     # Status
@@ -115,6 +116,10 @@ class UserSetupPreferences(Base):
     sms_enabled = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     voice_call_enabled = Column(
         Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    sms_min_severity = Column(String(20), nullable=False, default="high", server_default="high")
+    voice_call_min_severity = Column(
+        String(20), nullable=False, default="high", server_default="high"
     )
     sms_phone = Column(String(32), nullable=True)
     voice_phone = Column(String(32), nullable=True)

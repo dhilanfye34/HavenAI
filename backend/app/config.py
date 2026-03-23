@@ -5,6 +5,7 @@ Loads settings from environment variables with sensible defaults.
 """
 
 from pathlib import Path
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
@@ -26,9 +27,34 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     
-    # Email (optional)
-    sendgrid_api_key: Optional[str] = None
-    from_email: str = "noreply@havenai.ai"
+    # Notification providers (optional)
+    notification_email_provider: str = "sendgrid"
+    notification_sms_provider: str = "twilio"
+    notification_voice_provider: str = "twilio"
+    sendgrid_api_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("SENDGRID_API_KEY", "HAVENAI_SENDGRID_API_KEY"),
+    )
+    from_email: str = Field(
+        default="noreply@havenai.ai",
+        validation_alias=AliasChoices("FROM_EMAIL", "HAVENAI_NOTIFICATION_EMAIL_FROM"),
+    )
+    twilio_account_sid: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("TWILIO_ACCOUNT_SID", "HAVENAI_TWILIO_ACCOUNT_SID"),
+    )
+    twilio_auth_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("TWILIO_AUTH_TOKEN", "HAVENAI_TWILIO_AUTH_TOKEN"),
+    )
+    twilio_from_phone: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "TWILIO_FROM_PHONE",
+            "TWILIO_PHONE_NUMBER",
+            "HAVENAI_TWILIO_FROM_PHONE",
+        ),
+    )
 
     # AI provider
     openai_api_key: Optional[str] = None

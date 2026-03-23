@@ -115,6 +115,7 @@ class AlertResponse(BaseModel):
     title: str
     description: Optional[str]
     details: Optional[str]  # JSON string
+    notification_metadata: Optional[str]  # JSON string
     risk_score: Optional[float]
     is_resolved: bool
     created_at: datetime
@@ -179,6 +180,8 @@ class SetupPreferencesResponse(BaseModel):
     email_enabled: bool
     sms_enabled: bool
     voice_call_enabled: bool
+    sms_min_severity: Literal["low", "medium", "high", "critical"]
+    voice_call_min_severity: Literal["low", "medium", "high", "critical"]
     sms_phone: Optional[str] = None
     voice_phone: Optional[str] = None
     desktop_available: bool
@@ -197,6 +200,8 @@ class SetupPreferencesUpdate(BaseModel):
     email_enabled: Optional[bool] = None
     sms_enabled: Optional[bool] = None
     voice_call_enabled: Optional[bool] = None
+    sms_min_severity: Optional[Literal["low", "medium", "high", "critical"]] = None
+    voice_call_min_severity: Optional[Literal["low", "medium", "high", "critical"]] = None
     sms_phone: Optional[str] = None
     voice_phone: Optional[str] = None
 
@@ -208,6 +213,18 @@ class SetupPreferencesUpdate(BaseModel):
         normalized = value.strip()
         if normalized == "":
             return None
-        if len(normalized) < 7:
-            raise ValueError("Phone number looks too short.")
-        return normalized
+
+        compact = (
+            normalized.replace(" ", "")
+            .replace("-", "")
+            .replace("(", "")
+            .replace(")", "")
+            .replace(".", "")
+        )
+        has_plus = compact.startswith("+")
+        digits = compact[1:] if has_plus else compact
+        if not digits.isdigit():
+            raise ValueError("Phone number must contain only digits and optional + prefix.")
+        if len(digits) < 7 or len(digits) > 15:
+            raise ValueError("Phone number must contain between 7 and 15 digits.")
+        return f"+{digits}" if has_plus else digits
