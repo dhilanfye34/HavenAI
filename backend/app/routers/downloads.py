@@ -11,13 +11,20 @@ from typing import Optional
 router = APIRouter()
 
 APP_VERSION = "0.1.0"
+REPO_SLUG = "dhilanfye34/HavenAI"
+RELEASE_BASE = f"https://github.com/{REPO_SLUG}/releases/download/v{APP_VERSION}"
+
+
+def _asset_url(filename: str) -> str:
+    """Build a direct GitHub release asset URL for this project."""
+    return f"{RELEASE_BASE}/{filename}"
 
 DOWNLOADS = {
     "macos": {
         "platform": "macos",
         "label": "macOS",
-        "filename": f"HavenAI-{APP_VERSION}.dmg",
-        "url": f"https://github.com/HavenAI/releases/download/v{APP_VERSION}/HavenAI-{APP_VERSION}.dmg",
+        "filename": f"HavenAI-{APP_VERSION}-arm64.dmg",
+        "url": _asset_url(f"HavenAI-{APP_VERSION}-arm64.dmg"),
         "size": "85 MB",
         "min_os": "macOS 12 (Monterey)",
         "arch": "Universal (Intel + Apple Silicon)",
@@ -26,7 +33,7 @@ DOWNLOADS = {
         "platform": "windows",
         "label": "Windows",
         "filename": f"HavenAI-Setup-{APP_VERSION}.exe",
-        "url": f"https://github.com/HavenAI/releases/download/v{APP_VERSION}/HavenAI-Setup-{APP_VERSION}.exe",
+        "url": _asset_url(f"HavenAI-Setup-{APP_VERSION}.exe"),
         "size": "78 MB",
         "min_os": "Windows 10 (64-bit)",
         "arch": "x64",
@@ -35,7 +42,7 @@ DOWNLOADS = {
         "platform": "linux",
         "label": "Linux",
         "filename": f"HavenAI-{APP_VERSION}.AppImage",
-        "url": f"https://github.com/HavenAI/releases/download/v{APP_VERSION}/HavenAI-{APP_VERSION}.AppImage",
+        "url": _asset_url(f"HavenAI-{APP_VERSION}.AppImage"),
         "size": "90 MB",
         "min_os": "Ubuntu 20.04+ / Fedora 34+",
         "arch": "x64",

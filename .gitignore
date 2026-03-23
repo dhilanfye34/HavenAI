@@ -65,3 +65,5 @@ htmlcov/
 # Secrets
 *.pem
 *.key
+# Electron build artifacts
+desktop-app/electron/release/
