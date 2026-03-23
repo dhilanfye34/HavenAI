@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Set, Optional
 from queue import Queue
 import psutil
 import socket
+import subprocess
 import logging
 
 from .base import Agent
@@ -149,6 +150,14 @@ class NetworkAgent(Agent):
         
         # Update known connections
         self.known_connections = current_conn_keys
+
+        # macOS may restrict per-process connection visibility for psutil.
+        # Fall back to a lightweight netstat snapshot so the UI can still show
+        # active remote connections even when PID ownership is unavailable.
+        if not connections:
+            fallback_connections = self._netstat_fallback_snapshot()
+            if fallback_connections:
+                connections = fallback_connections
         
         return {
             "connections": connections,
@@ -178,6 +187,38 @@ class NetworkAgent(Agent):
         self.shared_context[self.name]["active_ips"] = list(set(
             c["remote_ip"] for c in observation["connections"] if c["remote_ip"]
         ))
+        self.shared_context[self.name]["active_connections"] = [
+            {
+                "process_name": c.get("process_name"),
+                "pid": c.get("pid"),
+                "remote_ip": c.get("remote_ip"),
+                "remote_port": c.get("remote_port"),
+                "hostname": c.get("hostname"),
+                "status": c.get("status"),
+            }
+            for c in observation["connections"][:160]
+        ]
+        recent_network_events = self.shared_context[self.name].get("recent_network_events", [])
+        recent_network_events.extend(
+            [
+                {
+                    "process_name": c.get("process_name"),
+                    "pid": c.get("pid"),
+                    "remote_ip": c.get("remote_ip"),
+                    "remote_port": c.get("remote_port"),
+                    "hostname": c.get("hostname"),
+                    "status": c.get("status"),
+                    "timestamp": observation.get("timestamp"),
+                }
+                for c in observation["new_connections"]
+            ]
+        )
+        self.shared_context[self.name]["recent_network_events"] = recent_network_events[-40:]
+        self.shared_context[self.name]["new_connection_count"] = len(observation["new_connections"])
+        self.shared_context[self.name]["total_new_connections"] = (
+            int(self.shared_context[self.name].get("total_new_connections", 0))
+            + len(observation["new_connections"])
+        )
         
         return {
             "findings": findings,
@@ -292,6 +333,69 @@ class NetworkAgent(Agent):
         except (socket.herror, socket.gaierror, socket.timeout):
             self.dns_cache[ip] = None
             return None
+
+    def _netstat_fallback_snapshot(self) -> List[Dict[str, Any]]:
+        """
+        Build active TCP connection snapshot without PID attribution.
+
+        Used when psutil cannot enumerate remote sockets due platform constraints.
+        """
+        try:
+            result = subprocess.run(
+                ["netstat", "-an", "-p", "tcp"],
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+                check=False,
+            )
+            if result.returncode != 0:
+                return []
+            rows = result.stdout.splitlines()
+        except Exception:
+            return []
+
+        snapshot: List[Dict[str, Any]] = []
+        for row in rows:
+            line = row.strip()
+            if not line.startswith("tcp"):
+                continue
+            parts = line.split()
+            if len(parts) < 6:
+                continue
+
+            local_addr = parts[3]
+            remote_addr = parts[4]
+            state = parts[5]
+            if remote_addr.startswith("127.") or remote_addr.startswith("::1"):
+                continue
+            if state not in {"ESTABLISHED", "SYN_SENT", "SYN_RECEIVED"}:
+                continue
+            if "." not in remote_addr:
+                continue
+
+            remote_ip, remote_port = remote_addr.rsplit(".", 1)
+            if not remote_port.isdigit():
+                continue
+
+            local_port = None
+            if "." in local_addr:
+                maybe_local_port = local_addr.rsplit(".", 1)[-1]
+                if maybe_local_port.isdigit():
+                    local_port = int(maybe_local_port)
+
+            snapshot.append(
+                {
+                    "local_port": local_port,
+                    "remote_ip": remote_ip,
+                    "remote_port": int(remote_port),
+                    "status": state,
+                    "pid": None,
+                    "process_name": "unknown",
+                    "hostname": self._reverse_dns(remote_ip),
+                }
+            )
+
+        return snapshot[:150]
     
     def _get_recommendation(self, risk_score: float, conn: Dict[str, Any]) -> str:
         """Generate a recommendation based on the connection analysis."""

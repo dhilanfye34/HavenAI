@@ -25,7 +25,16 @@ contextBridge.exposeInMainWorld('havenai', {
     process_monitoring_enabled?: boolean;
     network_monitoring_enabled?: boolean;
   }) => ipcRenderer.invoke('update-agent-preferences', payload),
+  getMonitorControlState: () => ipcRenderer.invoke('get-monitor-control-state'),
+  checkMonitorPermissions: (module: 'file' | 'process' | 'network') =>
+    ipcRenderer.invoke('check-monitor-permissions', module),
+  setMonitorDesired: (payload: { module: 'file' | 'process' | 'network'; enabled: boolean }) =>
+    ipcRenderer.invoke('set-monitor-desired', payload),
+  grantMonitorPermission: (module: 'file' | 'process' | 'network') =>
+    ipcRenderer.invoke('grant-monitor-permission', module),
   logoutAgent: () => ipcRenderer.invoke('agent-logout'),
+  openPermissionsSettings: (target?: 'file' | 'process' | 'network' | 'alerts' | 'all') =>
+    ipcRenderer.invoke('open-permissions-settings', target),
 
   // Credentials
   getCredentials: () => ipcRenderer.invoke('get-credentials'),
@@ -47,6 +56,9 @@ contextBridge.exposeInMainWorld('havenai', {
   },
   onAgentDevice: (callback: (device: any) => void) => {
     ipcRenderer.on('agent-device', (_, device) => callback(device));
+  },
+  onMonitorState: (callback: (state: any) => void) => {
+    ipcRenderer.on('monitor-state', (_, state) => callback(state));
   },
 
   // Remove listeners
@@ -78,7 +90,14 @@ declare global {
         process_monitoring_enabled?: boolean;
         network_monitoring_enabled?: boolean;
       }) => Promise<boolean>;
+      getMonitorControlState: () => Promise<any>;
+      checkMonitorPermissions: (module: 'file' | 'process' | 'network') => Promise<any>;
+      setMonitorDesired: (payload: { module: 'file' | 'process' | 'network'; enabled: boolean }) => Promise<any>;
+      grantMonitorPermission: (module: 'file' | 'process' | 'network') => Promise<any>;
       logoutAgent: () => Promise<boolean>;
+      openPermissionsSettings: (
+        target?: 'file' | 'process' | 'network' | 'alerts' | 'all',
+      ) => Promise<boolean>;
       getCredentials: () => Promise<{
         accessToken?: string;
         refreshToken?: string;
@@ -92,6 +111,7 @@ declare global {
       onAgentAuth: (callback: (auth: any) => void) => void;
       onAgentPreferences: (callback: (prefs: any) => void) => void;
       onAgentDevice: (callback: (device: any) => void) => void;
+      onMonitorState: (callback: (state: any) => void) => void;
       removeAllListeners: (channel: string) => void;
       platform: string;
       isPackaged: boolean;

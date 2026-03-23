@@ -2,6 +2,8 @@ export type AgentStatusLevel = 'active' | 'idle' | 'error';
 export type AlertSeverity = 'critical' | 'warning' | 'info';
 export type ChatRole = 'user' | 'assistant';
 export type ChatConnectionStatus = 'connected' | 'degraded' | 'offline';
+export type MonitorModule = 'file' | 'process' | 'network';
+export type MonitorLifecycleState = 'off' | 'pending_permission' | 'running' | 'blocked';
 
 export interface AgentStatus {
   id: string;
@@ -9,6 +11,110 @@ export interface AgentStatus {
   status: AgentStatusLevel;
   lastCheckIn: string;
   summary: string;
+}
+
+export interface RuntimeMetrics {
+  process_count: number;
+  process_events_seen: number;
+  network_connection_count: number;
+  network_events_seen: number;
+  active_remote_ips: number;
+  file_events_seen: number;
+  cpu_usage_percent: number;
+  memory_usage_percent: number;
+  disk_usage_percent: number;
+  log_storage_usage_percent: number;
+  uptime_seconds: number;
+}
+
+export interface AgentRuntimeStatus {
+  cloud_connected: boolean;
+  has_tokens: boolean;
+  device_id: string | null;
+  alert_count: number;
+  enabled_modules: {
+    file_monitoring_enabled: boolean;
+    process_monitoring_enabled: boolean;
+    network_monitoring_enabled: boolean;
+  };
+  auth_state: string;
+  auth_last_error: string | null;
+  last_heartbeat_at: string | null;
+  metrics: RuntimeMetrics | null;
+  module_details: {
+    file: {
+      event_count: number;
+      recent_events: Array<{
+        type?: string;
+        path?: string;
+        filename?: string;
+        extension?: string;
+        size?: number;
+        timestamp?: number;
+      }>;
+    };
+    process: {
+      event_count: number;
+      recent_events: Array<{
+        pid?: number;
+        name?: string;
+        parent_name?: string;
+        ppid?: number;
+        create_time?: number;
+      }>;
+      active_processes: Array<{
+        pid?: number;
+        name?: string;
+        parent_name?: string;
+        ppid?: number;
+        create_time?: number;
+      }>;
+      top_processes: Array<{
+        pid?: number;
+        name?: string;
+        cpu_percent?: number;
+        memory_percent?: number;
+        status?: string;
+      }>;
+    };
+    network: {
+      event_count: number;
+      recent_events: Array<{
+        process_name?: string;
+        pid?: number;
+        remote_ip?: string;
+        remote_port?: number;
+        hostname?: string;
+        status?: string;
+        timestamp?: number;
+      }>;
+      active_connections: Array<{
+        process_name?: string;
+        pid?: number;
+        remote_ip?: string;
+        remote_port?: number;
+        hostname?: string;
+        status?: string;
+      }>;
+    };
+  } | null;
+  permission_hints: {
+    platform: string;
+    maybe_blocked: boolean;
+    items: Array<{
+      id: string;
+      label: string;
+      description: string;
+    }>;
+  } | null;
+}
+
+export interface MonitorControlState {
+  desired: Record<MonitorModule, boolean>;
+  state: Record<MonitorModule, MonitorLifecycleState>;
+  blockers: Record<MonitorModule, string[]>;
+  grants: Record<MonitorModule, boolean>;
+  updated_at: string;
 }
 
 export interface SecurityAlert {

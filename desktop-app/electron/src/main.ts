@@ -8,9 +8,10 @@
  * - Shows native notifications
  */
 
-import { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell } from 'electron';
 import * as path from 'path';
 import * as os from 'os';
+import * as fs from 'fs';
 import { PythonBridge } from './python-bridge';
 import Store from 'electron-store';
 
@@ -26,6 +27,177 @@ let isQuitting = false;
 // Check if we're in development mode
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const rendererDevPort = process.env.RENDERER_PORT || '3001';
+
+type MonitorModule = 'file' | 'process' | 'network';
+type MonitorLifecycleState = 'off' | 'pending_permission' | 'running' | 'blocked';
+
+type MonitorDesired = Record<MonitorModule, boolean>;
+type MonitorStateMap = Record<MonitorModule, MonitorLifecycleState>;
+type MonitorBlockers = Record<MonitorModule, string[]>;
+type MonitorPermissionGrants = Record<MonitorModule, boolean>;
+
+const MONITOR_MODULES: MonitorModule[] = ['file', 'process', 'network'];
+const DEFAULT_MONITOR_DESIRED: MonitorDesired = {
+  file: false,
+  process: false,
+  network: false,
+};
+const DEFAULT_MONITOR_STATE: MonitorStateMap = {
+  file: 'off',
+  process: 'off',
+  network: 'off',
+};
+const DEFAULT_MONITOR_BLOCKERS: MonitorBlockers = {
+  file: [],
+  process: [],
+  network: [],
+};
+const DEFAULT_MONITOR_PERMISSION_GRANTS: MonitorPermissionGrants = {
+  file: false,
+  process: false,
+  network: false,
+};
+
+function readMonitorDesired(): MonitorDesired {
+  const raw = (store.get('monitorDesired') || {}) as Partial<MonitorDesired>;
+  return {
+    file: Boolean(raw.file),
+    process: Boolean(raw.process),
+    network: Boolean(raw.network),
+  };
+}
+
+function readMonitorStateMap(): MonitorStateMap {
+  const raw = (store.get('monitorState') || {}) as Partial<MonitorStateMap>;
+  return {
+    file: raw.file || DEFAULT_MONITOR_STATE.file,
+    process: raw.process || DEFAULT_MONITOR_STATE.process,
+    network: raw.network || DEFAULT_MONITOR_STATE.network,
+  };
+}
+
+function readMonitorBlockers(): MonitorBlockers {
+  const raw = (store.get('monitorBlockers') || {}) as Partial<MonitorBlockers>;
+  return {
+    file: Array.isArray(raw.file) ? raw.file : [],
+    process: Array.isArray(raw.process) ? raw.process : [],
+    network: Array.isArray(raw.network) ? raw.network : [],
+  };
+}
+
+function readMonitorPermissionGrants(): MonitorPermissionGrants {
+  const raw = (store.get('monitorPermissionGrants') || {}) as Partial<MonitorPermissionGrants>;
+  return {
+    file: Boolean(raw.file),
+    process: Boolean(raw.process),
+    network: Boolean(raw.network),
+  };
+}
+
+function writeMonitorState(
+  desired: MonitorDesired,
+  state: MonitorStateMap,
+  blockers: MonitorBlockers,
+  grants?: MonitorPermissionGrants,
+) {
+  store.set('monitorDesired', desired);
+  store.set('monitorState', state);
+  store.set('monitorBlockers', blockers);
+  if (grants) {
+    store.set('monitorPermissionGrants', grants);
+  }
+}
+
+function moduleToPreferencePatch(module: MonitorModule, enabled: boolean) {
+  if (module === 'file') return { file_monitoring_enabled: enabled };
+  if (module === 'process') return { process_monitoring_enabled: enabled };
+  return { network_monitoring_enabled: enabled };
+}
+
+function buildMonitorControlState() {
+  return {
+    desired: readMonitorDesired(),
+    state: readMonitorStateMap(),
+    blockers: readMonitorBlockers(),
+    grants: readMonitorPermissionGrants(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function emitMonitorControlState() {
+  mainWindow?.webContents.send('monitor-state', buildMonitorControlState());
+}
+
+function checkMonitorPermissions(module: MonitorModule): { allowed: boolean; blockers: string[] } {
+  const blockers: string[] = [];
+  const grants = readMonitorPermissionGrants();
+
+  if (!grants[module]) {
+    blockers.push('Access not granted yet. Use "Allow access and retry" to continue.');
+    return { allowed: false, blockers };
+  }
+
+  // File monitoring requires readable Desktop/Downloads paths.
+  if (module === 'file') {
+    const targets = [path.join(os.homedir(), 'Desktop'), path.join(os.homedir(), 'Downloads')];
+    for (const target of targets) {
+      try {
+        fs.accessSync(target, fs.constants.R_OK);
+      } catch {
+        blockers.push(`Cannot read ${target}. Grant Files and Folders / Full Disk Access.`);
+      }
+    }
+  }
+
+  // Process and network monitoring generally do not need a single explicit TCC gate.
+  if (module === 'process' && process.platform === 'darwin') {
+    blockers.push(...[]);
+  }
+  if (module === 'network' && process.platform === 'darwin') {
+    blockers.push(...[]);
+  }
+
+  return { allowed: blockers.length === 0, blockers };
+}
+
+async function setMonitorDesired(module: MonitorModule, enabled: boolean) {
+  const desired = readMonitorDesired();
+  const state = readMonitorStateMap();
+  const blockers = readMonitorBlockers();
+  const grants = readMonitorPermissionGrants();
+
+  desired[module] = enabled;
+
+  if (!enabled) {
+    state[module] = 'off';
+    blockers[module] = [];
+    writeMonitorState(desired, state, blockers, grants);
+    pythonBridge?.send({ type: 'update_preferences', data: moduleToPreferencePatch(module, false) });
+    emitMonitorControlState();
+    return buildMonitorControlState();
+  }
+
+  state[module] = 'pending_permission';
+  blockers[module] = [];
+  writeMonitorState(desired, state, blockers, grants);
+  emitMonitorControlState();
+
+  const permissionResult = checkMonitorPermissions(module);
+  if (!permissionResult.allowed) {
+    state[module] = 'blocked';
+    blockers[module] = permissionResult.blockers;
+    writeMonitorState(desired, state, blockers, grants);
+    emitMonitorControlState();
+    return buildMonitorControlState();
+  }
+
+  state[module] = 'running';
+  blockers[module] = [];
+  writeMonitorState(desired, state, blockers, grants);
+  pythonBridge?.send({ type: 'update_preferences', data: moduleToPreferencePatch(module, true) });
+  emitMonitorControlState();
+  return buildMonitorControlState();
+}
 
 function getDeviceMetadata() {
   const platformMap: Record<string, string> = {
@@ -214,6 +386,17 @@ function initPythonBridge(): void {
         device: getDeviceMetadata(),
       });
     }
+
+    // Strict startup behavior: restore remembered local desired monitor states.
+    const desired = readMonitorDesired();
+    MONITOR_MODULES.forEach((module) => {
+      if (desired[module]) {
+        setMonitorDesired(module, true).catch(() => undefined);
+      } else {
+        pythonBridge?.send({ type: 'update_preferences', data: moduleToPreferencePatch(module, false) });
+      }
+    });
+    emitMonitorControlState();
   });
 
   pythonBridge.on('alert', (alert: any) => {
@@ -233,6 +416,34 @@ function initPythonBridge(): void {
   pythonBridge.on('status', (status: any) => {
     if (status?.device_id) {
       store.set('deviceId', status.device_id);
+    }
+    // Keep local monitor state in sync with actual runtime state from Python.
+    const desired = readMonitorDesired();
+    const state = readMonitorStateMap();
+    const blockers = readMonitorBlockers();
+    const enabled = status?.enabled_modules || {};
+    const byModule: Record<MonitorModule, boolean> = {
+      file: Boolean(enabled.file_monitoring_enabled),
+      process: Boolean(enabled.process_monitoring_enabled),
+      network: Boolean(enabled.network_monitoring_enabled),
+    };
+    let changed = false;
+    MONITOR_MODULES.forEach((module) => {
+      if (byModule[module]) {
+        if (state[module] !== 'running') {
+          state[module] = 'running';
+          blockers[module] = [];
+          changed = true;
+        }
+      } else if (!desired[module] && state[module] !== 'off') {
+        state[module] = 'off';
+        blockers[module] = [];
+        changed = true;
+      }
+    });
+    if (changed) {
+      writeMonitorState(desired, state, blockers);
+      emitMonitorControlState();
     }
     mainWindow?.webContents.send('agent-status', status);
   });
@@ -313,10 +524,29 @@ ipcMain.handle('get-credentials', () => {
 
 // Save credentials
 ipcMain.handle('save-credentials', (_, credentials) => {
-  store.set('accessToken', credentials.accessToken);
-  store.set('refreshToken', credentials.refreshToken);
-  store.set('user', credentials.user);
-  store.set('deviceId', credentials.deviceId);
+  if (credentials?.accessToken) {
+    store.set('accessToken', credentials.accessToken);
+  } else {
+    store.delete('accessToken');
+  }
+
+  if (credentials?.refreshToken) {
+    store.set('refreshToken', credentials.refreshToken);
+  } else {
+    store.delete('refreshToken');
+  }
+
+  if (credentials?.user) {
+    store.set('user', credentials.user);
+  } else {
+    store.delete('user');
+  }
+
+  if (credentials?.deviceId) {
+    store.set('deviceId', credentials.deviceId);
+  } else {
+    store.delete('deviceId');
+  }
   return true;
 });
 
@@ -372,10 +602,85 @@ ipcMain.handle('update-agent-preferences', (_, payload) => {
   return true;
 });
 
+ipcMain.handle('get-monitor-control-state', () => buildMonitorControlState());
+
+ipcMain.handle('check-monitor-permissions', (_, module: MonitorModule) => {
+  return checkMonitorPermissions(module);
+});
+
+ipcMain.handle('set-monitor-desired', (_, payload: { module: MonitorModule; enabled: boolean }) => {
+  if (!payload?.module || !MONITOR_MODULES.includes(payload.module)) {
+    return buildMonitorControlState();
+  }
+  return setMonitorDesired(payload.module, Boolean(payload.enabled));
+});
+
+ipcMain.handle('grant-monitor-permission', (_, module: MonitorModule) => {
+  if (!module || !MONITOR_MODULES.includes(module)) {
+    return buildMonitorControlState();
+  }
+  const desired = readMonitorDesired();
+  const state = readMonitorStateMap();
+  const blockers = readMonitorBlockers();
+  const grants = readMonitorPermissionGrants();
+  grants[module] = true;
+  if (state[module] === 'blocked') {
+    state[module] = 'pending_permission';
+    blockers[module] = [];
+  }
+  writeMonitorState(desired, state, blockers, grants);
+  emitMonitorControlState();
+  return buildMonitorControlState();
+});
+
 ipcMain.handle('agent-logout', () => {
   pythonBridge?.send({ type: 'logout' });
   store.delete('deviceId');
   return true;
+});
+
+ipcMain.handle('open-permissions-settings', async (_, target?: 'file' | 'process' | 'network' | 'alerts' | 'all') => {
+  if (process.platform === 'darwin') {
+    const targetToUrls: Record<string, string[]> = {
+      file: [
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders',
+      ],
+      process: [
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
+      ],
+      network: [
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork',
+      ],
+      alerts: [
+        'x-apple.systempreferences:com.apple.preference.notifications',
+      ],
+      all: [
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders',
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork',
+        'x-apple.systempreferences:com.apple.preference.notifications',
+      ],
+    };
+    const urls = targetToUrls[target || 'all'] || targetToUrls.all;
+    for (const url of urls) {
+      try {
+        await shell.openExternal(url);
+      } catch {
+        // Continue to next target if a deep-link is not supported.
+      }
+    }
+    return true;
+  }
+
+  // Non-macOS fallback.
+  try {
+    await shell.openExternal('https://support.apple.com/guide/mac-help/control-access-to-files-and-folders-on-mac-mchld5a35146/mac');
+    return true;
+  } catch {
+    return false;
+  }
 });
 
 // ============== App Lifecycle ==============
@@ -384,6 +689,7 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   initPythonBridge();
+  emitMonitorControlState();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

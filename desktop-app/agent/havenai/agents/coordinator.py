@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from queue import Queue, Empty
 from threading import Thread
 import logging
+from pathlib import Path
 
 from .base import Agent
 from .file_agent import FileAgent
@@ -26,6 +27,11 @@ from .message_agent import MessageAgent
 from havenai.api import get_client
 
 logger = logging.getLogger(__name__)
+
+try:
+    import psutil  # type: ignore
+except Exception:  # pragma: no cover - optional fallback
+    psutil = None
 
 
 class Coordinator:
@@ -67,9 +73,9 @@ class Coordinator:
         self._preferences_sync_interval = 20.0
 
         self._default_monitor_preferences = {
-            "file_monitoring_enabled": True,
-            "process_monitoring_enabled": True,
-            "network_monitoring_enabled": True,
+            "file_monitoring_enabled": False,
+            "process_monitoring_enabled": False,
+            "network_monitoring_enabled": False,
         }
         self._monitor_config_map = {
             "file_monitoring_enabled": ("FileAgent", FileAgent),
@@ -90,6 +96,11 @@ class Coordinator:
             "last_heartbeat_ok": None,
             "last_heartbeat_at": None,
         }
+        # When a user toggles monitor modules in the desktop UI, prefer those local
+        # runtime choices instead of periodically re-overwriting from backend prefs.
+        self._local_preferences_override = False
+        self._started_at = time.time()
+        self._alerts_processed = 0
     
     def initialize_agents(self) -> None:
         """Create all agent instances."""
@@ -114,8 +125,7 @@ class Coordinator:
             agent.start()
             logger.info(f"  ✓ {agent.name} started")
 
-        # Hydrate runtime modules from remote preferences (if authenticated).
-        self._fetch_and_apply_preferences(force=True, send_event=False)
+        # Strict local startup: monitor modules begin from local desired state (default off).
         self._sync_monitor_agents()
         self._send_status()
         
@@ -149,9 +159,6 @@ class Coordinator:
             # Send heartbeat periodically
             self._maybe_send_heartbeat()
 
-            # Sync preferences from backend periodically when authenticated.
-            self._maybe_sync_preferences()
-            
             time.sleep(0.5)
     
     def _process_alerts(self) -> None:
@@ -165,6 +172,7 @@ class Coordinator:
     
     def _handle_alert(self, alert: Dict[str, Any]) -> None:
         """Handle a single alert - log, sync to cloud, notify UI."""
+        self._alerts_processed += 1
         # Log the alert
         logger.info(f"Alert from {alert.get('agent', 'unknown')}: {alert.get('type')}")
 
@@ -259,8 +267,12 @@ class Coordinator:
             heartbeat_ok = False
             if self.api_client.is_authenticated():
                 heartbeat_ok = self.api_client.heartbeat()
+                if not heartbeat_ok and self.api_client.has_tokens() and not self.api_client.device_id:
+                    heartbeat_ok = self._ensure_device_registered()
                 if not heartbeat_ok and self.api_client.refresh_access_token():
                     heartbeat_ok = self.api_client.heartbeat()
+                    if not heartbeat_ok and self.api_client.has_tokens() and not self.api_client.device_id:
+                        heartbeat_ok = self._ensure_device_registered()
             elif self.api_client.has_tokens():
                 # We have auth tokens but no device id yet.
                 heartbeat_ok = self._ensure_device_registered()
@@ -289,6 +301,8 @@ class Coordinator:
     def _fetch_and_apply_preferences(self, force: bool, send_event: bool) -> None:
         """Fetch latest setup preferences and apply local monitor runtime changes."""
         if not self.api_client or not self.api_client.has_tokens():
+            return
+        if not force and self._local_preferences_override:
             return
 
         prefs = self.api_client.get_setup_preferences()
@@ -370,6 +384,7 @@ class Coordinator:
             agent.name: self.shared_context.get(agent.name, {}).get("status", "unknown")
             for agent in self.always_on_agents
         }
+        metrics = self._collect_runtime_metrics()
         return {
             "agents": {**monitor_status, **always_on_status},
             "enabled_modules": dict(self._desired_preferences),
@@ -377,7 +392,185 @@ class Coordinator:
             "has_tokens": self.api_client.has_tokens() if self.api_client else False,
             "device_id": self.api_client.device_id if self.api_client else None,
             "auth_status": dict(self._auth_status),
-            "alert_count": self.alert_queue.qsize(),
+            "alert_count": self._alerts_processed,
+            "metrics": metrics,
+            "module_details": self._collect_module_details(),
+            "permission_hints": self._collect_permission_hints(metrics),
+        }
+
+    def _collect_runtime_metrics(self) -> Dict[str, Any]:
+        """Collect live runtime telemetry for right-side dashboard cards."""
+        file_ctx = self.shared_context.get("FileAgent", {})
+        process_ctx = self.shared_context.get("ProcessAgent", {})
+        network_ctx = self.shared_context.get("NetworkAgent", {})
+        file_running = "FileAgent" in self.monitor_agents
+        process_running = "ProcessAgent" in self.monitor_agents
+        network_running = "NetworkAgent" in self.monitor_agents
+
+        cpu_usage = 0.0
+        memory_usage = 0.0
+        disk_usage = 0.0
+        process_count = int(process_ctx.get("process_count", 0) or 0) if process_running else 0
+        network_connection_count = (
+            int(network_ctx.get("connection_count", 0) or 0) if network_running else 0
+        )
+        active_remote_ips = len(network_ctx.get("active_ips", []) or []) if network_running else 0
+
+        if psutil:
+            try:
+                cpu_usage = float(psutil.cpu_percent(interval=None))
+            except Exception:
+                cpu_usage = 0.0
+            try:
+                memory_usage = float(psutil.virtual_memory().percent)
+            except Exception:
+                memory_usage = 0.0
+            try:
+                disk_usage = float(psutil.disk_usage(str(Path.home())).percent)
+            except Exception:
+                disk_usage = 0.0
+            if process_running:
+                try:
+                    process_count = max(process_count, len(psutil.pids()))
+                except Exception:
+                    pass
+            if network_running:
+                try:
+                    conns = psutil.net_connections(kind="inet")
+                    remote = [c for c in conns if c.raddr]
+                    network_connection_count = max(network_connection_count, len(remote))
+                    active_remote_ips = max(
+                        active_remote_ips,
+                        len({c.raddr.ip for c in remote if getattr(c.raddr, "ip", None)}),
+                    )
+                except Exception:
+                    pass
+
+        log_usage = 0.0
+        try:
+            log_path = Path("havenai-agent.log")
+            if log_path.exists():
+                # Map log file growth into a friendly 0-100 gauge.
+                log_usage = min(100.0, (log_path.stat().st_size / (1024 * 1024 * 20)) * 100.0)
+        except Exception:
+            log_usage = 0.0
+
+        return {
+            "process_count": process_count,
+            "process_events_seen": int(process_ctx.get("total_new_processes", 0) or 0)
+            if process_running
+            else 0,
+            "network_connection_count": network_connection_count,
+            "network_events_seen": int(network_ctx.get("total_new_connections", 0) or 0)
+            if network_running
+            else 0,
+            "active_remote_ips": active_remote_ips,
+            "file_events_seen": int(file_ctx.get("total_event_count", 0) or 0)
+            if file_running
+            else 0,
+            "cpu_usage_percent": round(cpu_usage, 2),
+            "memory_usage_percent": round(memory_usage, 2),
+            "disk_usage_percent": round(disk_usage, 2),
+            "log_storage_usage_percent": round(log_usage, 2),
+            "uptime_seconds": max(0, int(time.time() - self._started_at)),
+        }
+
+    def _collect_module_details(self) -> Dict[str, Any]:
+        """Build rich per-module detail payload for the runtime inspector UI."""
+        file_ctx = self.shared_context.get("FileAgent", {})
+        process_ctx = self.shared_context.get("ProcessAgent", {})
+        network_ctx = self.shared_context.get("NetworkAgent", {})
+        file_running = "FileAgent" in self.monitor_agents
+        process_running = "ProcessAgent" in self.monitor_agents
+        network_running = "NetworkAgent" in self.monitor_agents
+
+        top_processes: List[Dict[str, Any]] = []
+        if psutil and process_running:
+            try:
+                for proc in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent", "status"]):
+                    try:
+                        info = proc.info
+                        top_processes.append(
+                            {
+                                "pid": info.get("pid"),
+                                "name": info.get("name") or "unknown",
+                                "cpu_percent": float(info.get("cpu_percent") or 0.0),
+                                "memory_percent": float(info.get("memory_percent") or 0.0),
+                                "status": info.get("status") or "unknown",
+                            }
+                        )
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+                top_processes.sort(
+                    key=lambda p: (p.get("cpu_percent", 0.0), p.get("memory_percent", 0.0)),
+                    reverse=True,
+                )
+            except Exception:
+                top_processes = []
+
+        return {
+            "file": {
+                "event_count": int(file_ctx.get("total_event_count", 0) or 0) if file_running else 0,
+                "recent_events": list(file_ctx.get("recent_events", []) or [])[-20:] if file_running else [],
+            },
+            "process": {
+                "event_count": int(process_ctx.get("total_new_processes", 0) or 0)
+                if process_running
+                else 0,
+                "recent_events": list(process_ctx.get("recent_process_events", []) or [])[-20:]
+                if process_running
+                else [],
+                "active_processes": list(process_ctx.get("active_processes", []) or [])[:40]
+                if process_running
+                else [],
+                "top_processes": top_processes[:12],
+            },
+            "network": {
+                "event_count": int(network_ctx.get("total_new_connections", 0) or 0)
+                if network_running
+                else 0,
+                "recent_events": list(network_ctx.get("recent_network_events", []) or [])[-20:]
+                if network_running
+                else [],
+                "active_connections": list(network_ctx.get("active_connections", []) or [])[:50]
+                if network_running
+                else [],
+            },
+        }
+
+    def _collect_permission_hints(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Return platform-specific permission guidance and probable blockers."""
+        uptime = int(metrics.get("uptime_seconds", 0))
+        monitored_total = (
+            int(metrics.get("file_events_seen", 0))
+            + int(metrics.get("process_events_seen", 0))
+            + int(metrics.get("network_events_seen", 0))
+        )
+        monitors_enabled = any(
+            bool(self._desired_preferences.get(key))
+            for key in self._default_monitor_preferences.keys()
+        )
+        maybe_blocked = bool(monitors_enabled and uptime >= 45 and monitored_total == 0)
+        return {
+            "platform": sys.platform,
+            "maybe_blocked": maybe_blocked,
+            "items": [
+                {
+                    "id": "full_disk_access",
+                    "label": "Full Disk Access",
+                    "description": "Allows file monitoring to inspect Desktop/Downloads paths reliably.",
+                },
+                {
+                    "id": "files_and_folders",
+                    "label": "Files and Folders",
+                    "description": "Grant Desktop and Downloads access for event visibility.",
+                },
+                {
+                    "id": "network",
+                    "label": "Network Monitoring Access",
+                    "description": "Some macOS setups limit process-to-socket visibility without additional privileges.",
+                },
+            ],
         }
 
     def _send_status(self) -> None:
@@ -432,7 +625,6 @@ class Coordinator:
                 try:
                     self.api_client.login(email, password)
                     self._ensure_device_registered()
-                    self._fetch_and_apply_preferences(force=True, send_event=True)
                     self._auth_status["state"] = "connected"
                     self._auth_status["last_error"] = None
                     self._send_to_electron(
@@ -476,7 +668,6 @@ class Coordinator:
                     }
                 )
                 self._ensure_device_registered()
-                self._fetch_and_apply_preferences(force=True, send_event=True)
                 self._auth_status["state"] = "connected" if self.api_client.is_authenticated() else "partial"
                 self._auth_status["last_error"] = None
                 self._send_to_electron(
@@ -498,6 +689,7 @@ class Coordinator:
                         changed = True
 
             if changed:
+                self._local_preferences_override = True
                 self._sync_monitor_agents()
                 self._send_to_electron(
                     {
@@ -512,6 +704,7 @@ class Coordinator:
                 self.api_client.clear_session()
             self._auth_status["state"] = "unauthenticated"
             self._auth_status["last_error"] = None
+            self._local_preferences_override = False
             self._send_status()
         
         else:

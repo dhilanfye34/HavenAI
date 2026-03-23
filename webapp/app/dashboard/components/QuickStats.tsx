@@ -7,6 +7,10 @@ interface QuickStatsProps {
 }
 
 export function QuickStats({ stats }: QuickStatsProps) {
+  const trendLabel = `${stats.threatsTrend >= 0 ? '+' : ''}${stats.threatsTrend}%`;
+  const trendClass = stats.threatsTrend > 0 ? 'text-red-400' : stats.threatsTrend < 0 ? 'text-green-400' : 'text-gray-400';
+  const intensityBar = `${Math.max(8, Math.min(100, stats.threatsBlocked24h * 6))}%`;
+
   return (
     <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-4">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-300">Quick Stats</h2>
@@ -15,13 +19,13 @@ export function QuickStats({ stats }: QuickStatsProps) {
           <div className="flex items-center justify-between text-xs text-gray-400">
             <span className="inline-flex items-center gap-1">
               <ShieldAlert className="h-3.5 w-3.5" />
-              Threats Blocked (24h)
+              Alerts Flagged (24h)
             </span>
-            <span className="text-green-400">+{stats.threatsTrend}%</span>
+            <span className={trendClass}>{trendLabel}</span>
           </div>
           <p className="mt-1 text-xl font-semibold text-white">{stats.threatsBlocked24h}</p>
           <div className="mt-2 h-1.5 rounded bg-gray-700">
-            <div className="h-1.5 rounded bg-cyan-400" style={{ width: '72%' }} />
+            <div className="h-1.5 rounded bg-cyan-400" style={{ width: intensityBar }} />
           </div>
         </div>
 
@@ -34,7 +38,7 @@ export function QuickStats({ stats }: QuickStatsProps) {
         </div>
 
         <div className="rounded-lg border border-gray-700 bg-gray-800 p-3">
-          <p className="text-xs text-gray-400">Files Monitored</p>
+          <p className="text-xs text-gray-400">File Events Seen</p>
           <p className="mt-1 text-lg font-semibold text-white">
             {stats.filesMonitored.toLocaleString()}
           </p>

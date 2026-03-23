@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { streamChatCompletion } from '../services/chatApi';
 import {
+  AgentRuntimeStatus,
   ChatConnectionStatus,
   ChatContextEvent,
   ChatMessage,
@@ -27,6 +28,8 @@ export function useChat() {
     useState<ChatConnectionStatus>('degraded');
   const messagesRef = useRef<ChatMessage[]>([assistantGreeting]);
   const contextEventsRef = useRef<ChatContextEvent[]>([]);
+  const lastRuntimeDigestRef = useRef<string>('');
+  const lastRuntimeInjectAtRef = useRef<number>(0);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -61,6 +64,67 @@ export function useChat() {
         },
         ...current,
       ].slice(0, 20),
+    );
+  };
+
+  const injectRuntimeContext = (runtimeStatus: AgentRuntimeStatus | null) => {
+    if (!runtimeStatus) return;
+
+    const enabled = runtimeStatus.enabled_modules;
+    const details = runtimeStatus.module_details;
+    const processTop = (details?.process?.top_processes || [])
+      .slice(0, 5)
+      .map((proc) => `${proc.name || 'unknown'}(${proc.pid ?? 'n/a'})`)
+      .join(', ');
+    const recentFile = details?.file?.recent_events?.slice(-1)?.[0];
+    const recentProcess = details?.process?.recent_events?.slice(-1)?.[0];
+    const recentNetwork = details?.network?.recent_events?.slice(-1)?.[0];
+
+    const digest = JSON.stringify({
+      enabled,
+      auth: runtimeStatus.auth_state,
+      alerts: runtimeStatus.alert_count,
+      metrics: runtimeStatus.metrics,
+      fileTs: recentFile?.timestamp || null,
+      processTs: recentProcess?.create_time || null,
+      networkTs: recentNetwork?.timestamp || null,
+    });
+
+    const now = Date.now();
+    const minIntervalMs = 12000;
+    if (digest === lastRuntimeDigestRef.current) return;
+    if (now - lastRuntimeInjectAtRef.current < minIntervalMs) return;
+
+    lastRuntimeDigestRef.current = digest;
+    lastRuntimeInjectAtRef.current = now;
+
+    const blockedLikely = Boolean(runtimeStatus.permission_hints?.maybe_blocked);
+    const severity = blockedLikely ? 'warning' : 'info';
+    const descriptionParts = [
+      `Modules enabled: file=${enabled.file_monitoring_enabled}, process=${enabled.process_monitoring_enabled}, network=${enabled.network_monitoring_enabled}.`,
+      `Runtime counts: files=${runtimeStatus.metrics?.file_events_seen ?? 0}, process_events=${runtimeStatus.metrics?.process_events_seen ?? 0}, network_events=${runtimeStatus.metrics?.network_events_seen ?? 0}, active_connections=${runtimeStatus.metrics?.network_connection_count ?? 0}.`,
+      processTop ? `Top processes: ${processTop}.` : '',
+      recentFile
+        ? `Latest file event: ${recentFile.type || 'event'} ${recentFile.filename || recentFile.path || 'unknown file'}.`
+        : '',
+      recentProcess
+        ? `Latest process event: ${recentProcess.name || 'unknown'} (pid ${recentProcess.pid ?? 'n/a'}).`
+        : '',
+      recentNetwork
+        ? `Latest network event: ${recentNetwork.process_name || 'unknown'} -> ${recentNetwork.hostname || recentNetwork.remote_ip || 'unknown'}:${recentNetwork.remote_port ?? 'n/a'}.`
+        : '',
+    ].filter(Boolean);
+
+    setContextEvents((current) =>
+      [
+        {
+          source: 'Runtime Telemetry',
+          severity,
+          timestamp: new Date().toISOString(),
+          description: descriptionParts.join(' '),
+        },
+        ...current,
+      ].slice(0, 30),
     );
   };
 
@@ -151,6 +215,7 @@ export function useChat() {
     contextEvents,
     injectAlertContext,
     injectRecommendationContext,
+    injectRuntimeContext,
     sendMessage,
   };
 }

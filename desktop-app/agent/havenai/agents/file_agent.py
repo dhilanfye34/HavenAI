@@ -169,6 +169,26 @@ class FileAgent(Agent):
         self.shared_context[self.name]["recent_files"] = [
             e["path"] for e in observation["events"]
         ]
+        recent_events = self.shared_context[self.name].get("recent_events", [])
+        recent_events.extend(
+            [
+                {
+                    "type": e.get("type"),
+                    "path": e.get("path"),
+                    "filename": e.get("filename"),
+                    "extension": e.get("extension"),
+                    "size": e.get("size"),
+                    "timestamp": e.get("timestamp"),
+                }
+                for e in observation["events"]
+            ]
+        )
+        self.shared_context[self.name]["recent_events"] = recent_events[-40:]
+        self.shared_context[self.name]["event_count"] = len(observation["events"])
+        self.shared_context[self.name]["total_event_count"] = (
+            int(self.shared_context[self.name].get("total_event_count", 0))
+            + len(observation["events"])
+        )
         
         return {
             "findings": findings,

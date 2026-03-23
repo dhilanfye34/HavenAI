@@ -141,6 +141,35 @@ class ProcessAgent(Agent):
         self.shared_context[self.name]["recent_spawns"] = [
             p["name"] for p in observation["new_processes"]
         ]
+        self.shared_context[self.name]["active_processes"] = [
+            {
+                "pid": p.get("pid"),
+                "name": p.get("name"),
+                "parent_name": p.get("parent_name"),
+                "ppid": p.get("ppid"),
+                "create_time": p.get("create_time"),
+            }
+            for p in observation["current_processes"][:120]
+        ]
+        recent_process_events = self.shared_context[self.name].get("recent_process_events", [])
+        recent_process_events.extend(
+            [
+                {
+                    "pid": p.get("pid"),
+                    "name": p.get("name"),
+                    "parent_name": p.get("parent_name"),
+                    "ppid": p.get("ppid"),
+                    "create_time": p.get("create_time"),
+                }
+                for p in observation["new_processes"]
+            ]
+        )
+        self.shared_context[self.name]["recent_process_events"] = recent_process_events[-40:]
+        self.shared_context[self.name]["new_process_count"] = len(observation["new_processes"])
+        self.shared_context[self.name]["total_new_processes"] = (
+            int(self.shared_context[self.name].get("total_new_processes", 0))
+            + len(observation["new_processes"])
+        )
         
         return {
             "findings": findings,

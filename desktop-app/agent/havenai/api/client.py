@@ -335,6 +335,12 @@ class APIClient:
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                # Backend no longer recognizes this device id; force re-registration.
+                self.device_id = None
+                self._save_config()
+                logger.info("Stored device id is invalid; will re-register device")
+                return False
             if e.response.status_code == 401 and self.refresh_access_token():
                 try:
                     retry = self.client.post(
