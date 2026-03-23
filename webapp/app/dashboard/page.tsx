@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Activity, Eye, Server } from 'lucide-react';
 
 import { AgentPanel } from './components/AgentPanel';
 import { AlertFeed } from './components/AlertFeed';
@@ -25,6 +26,8 @@ type LocalUser = {
   full_name?: string;
 };
 
+type DashboardTab = 'overview' | 'runtime' | 'agents';
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -39,14 +42,19 @@ function formatUptime(seconds: number) {
   return `${minutes}m`;
 }
 
+const TAB_META: { id: DashboardTab; label: string; icon: typeof Eye }[] = [
+  { id: 'overview', label: 'Overview', icon: Eye },
+  { id: 'runtime', label: 'Runtime', icon: Activity },
+  { id: 'agents', label: 'Agents', icon: Server },
+];
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<LocalUser | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [isDesktopRuntime, setIsDesktopRuntime] = useState(false);
+  const [tab, setTab] = useState<DashboardTab>('overview');
 
   const { agents, runtimeStatus } = useAgentStatus();
   const { alerts, counts, latestAlertId } = useAlerts();
@@ -89,9 +97,6 @@ export default function DashboardPage() {
       setUser({ email: 'Unknown user' });
     }
 
-    const isWide = window.innerWidth >= 1280;
-    setLeftOpen(isWide);
-    setRightOpen(isWide);
     setIsDesktopRuntime(Boolean((window as any).havenai));
     setIsReady(true);
   }, [router]);
@@ -100,6 +105,7 @@ export default function DashboardPage() {
     () => counts.critical + counts.warning,
     [counts.critical, counts.warning],
   );
+  const latestAlert = alerts[0] || null;
 
   useEffect(() => {
     injectRuntimeContext(runtimeStatus);
@@ -238,68 +244,156 @@ export default function DashboardPage() {
       <TopBar
         userLabel={user?.full_name || user?.email || 'Security Operator'}
         notificationCount={notificationCount}
-        leftOpen={leftOpen}
-        rightOpen={rightOpen}
-        onToggleLeft={() => setLeftOpen((value) => !value)}
-        onToggleRight={() => setRightOpen((value) => !value)}
         onLogout={handleLogout}
       />
 
-      <main className="mx-auto max-w-[1600px] px-4 py-4 md:px-6">
-        <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
-          <aside className={`${leftOpen ? 'block' : 'hidden'} xl:block`}>
-            <SetupPanel
-              preferences={preferences}
-              loading={setupLoading}
-              saving={setupSaving}
-              error={setupError}
-              saveError={setupSaveError}
-              saveSuccess={
-                setupSaveSuccess ||
-                (protectionStatus?.has_devices
-                  ? 'Desktop connected. Monitoring modules available.'
-                  : null)
-              }
-              recentAlerts={alerts}
-              runtimeStatus={runtimeStatus}
-              monitorControl={monitorControl}
-              onSave={saveSetupPreferences}
-              isDesktopRuntime={isDesktopRuntime}
-            />
-            <AgentPanel agents={agents} />
-            <AlertFeed
-              alerts={alerts}
-              latestAlertId={latestAlertId}
-              onSelectAlert={(alert) => injectAlertContext(alert)}
-            />
-          </aside>
-
-          <section className="min-w-0">
-            <ChatPanel
-              messages={messages}
-              isResponding={isResponding}
-              connectionStatus={connectionStatus}
-              connectionLabel={connectionLabel}
-              contextEvents={contextEvents}
-              onSendMessage={sendMessage}
-            />
-            <RuntimeInspector
-              runtimeStatus={runtimeStatus}
-              isDesktopRuntime={isDesktopRuntime}
-              monitorControl={monitorControl}
-            />
-          </section>
-
-          <aside className={`${rightOpen ? 'block' : 'hidden'} space-y-4 xl:block`}>
-            <HealthScore score={liveStats.healthScore} />
-            <QuickStats stats={liveStats} />
-            <ResourceMonitor stats={liveStats} />
-            <Recommendations
-              recommendations={isDesktopRuntime ? recommendations : mockRecommendations}
-              onSelect={(recommendation) => injectRecommendationContext(recommendation)}
-            />
-          </aside>
+      <nav className="border-b border-gray-800 bg-gray-900/80">
+        <div className="mx-auto flex max-w-[1600px] items-center gap-1 px-4 py-2 md:px-6">
+          {TAB_META.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                tab === id
+                  ? 'bg-cyan-500/15 text-cyan-300'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
         </div>
+      </nav>
+
+      <main className="mx-auto max-w-[1600px] px-4 py-3 md:px-6">
+        {tab === 'overview' && (
+          <div className="space-y-3">
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(360px,1fr)]">
+              <div className="space-y-3">
+                <section className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+                  <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                          Live Triage
+                        </h2>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Prioritized alerts and runtime signal.
+                        </p>
+                      </div>
+                      <span className="rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-300">
+                        {alerts.length} events
+                      </span>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                      <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-xs">
+                        <p className="text-red-200">Critical</p>
+                        <p className="mt-0.5 text-lg font-semibold text-red-100">{counts.critical}</p>
+                      </div>
+                      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+                        <p className="text-amber-200">Warning</p>
+                        <p className="mt-0.5 text-lg font-semibold text-amber-100">{counts.warning}</p>
+                      </div>
+                      <div className="rounded-lg border border-blue-500/40 bg-blue-500/10 p-2 text-xs">
+                        <p className="text-blue-200">Info</p>
+                        <p className="mt-0.5 text-lg font-semibold text-blue-100">{counts.info}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 rounded-lg border border-gray-700 bg-gray-800/60 p-2 text-xs">
+                      <p className="text-gray-400">Latest event</p>
+                      <p className="mt-0.5 line-clamp-1 text-sm text-gray-100">
+                        {latestAlert ? latestAlert.description : 'No incoming alerts yet.'}
+                      </p>
+                      {latestAlert && (
+                        <p className="mt-0.5 text-gray-500">
+                          {latestAlert.source} &bull; {new Date(latestAlert.timestamp).toLocaleTimeString()}
+                        </p>
+                      )}
+                    </div>
+                  </section>
+
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                    <HealthScore score={liveStats.healthScore} />
+                    <QuickStats stats={liveStats} />
+                  </div>
+                </section>
+
+                <AlertFeed
+                  alerts={alerts}
+                  latestAlertId={latestAlertId}
+                  onSelectAlert={(alert) => injectAlertContext(alert)}
+                />
+              </div>
+
+              <ChatPanel
+                messages={messages}
+                isResponding={isResponding}
+                connectionStatus={connectionStatus}
+                connectionLabel={connectionLabel}
+                contextEvents={contextEvents}
+                onSendMessage={sendMessage}
+              />
+            </div>
+          </div>
+        )}
+
+        {tab === 'runtime' && (
+          <RuntimeInspector
+            runtimeStatus={runtimeStatus}
+            isDesktopRuntime={isDesktopRuntime}
+            monitorControl={monitorControl}
+          />
+        )}
+
+        {tab === 'agents' && (
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+            <AgentPanel agents={agents.map((agent) => {
+              if (agent.id === 'EmailInboxAgent') {
+                const on = Boolean(preferences?.email_enabled);
+                return {
+                  ...agent,
+                  status: on ? agent.status : 'idle',
+                  summary: on ? agent.summary : 'Email alerts are disabled. Enable in Monitor Controls.',
+                };
+              }
+              if (agent.id === 'MessageAgent') {
+                const on = Boolean(preferences?.sms_enabled || preferences?.voice_call_enabled);
+                return {
+                  ...agent,
+                  status: on ? agent.status : 'idle',
+                  summary: on ? agent.summary : 'SMS and voice alerts are disabled. Enable in Monitor Controls.',
+                };
+              }
+              return agent;
+            })} />
+            <div className="space-y-3">
+              <SetupPanel
+                preferences={preferences}
+                loading={setupLoading}
+                saving={setupSaving}
+                error={setupError}
+                saveError={setupSaveError}
+                saveSuccess={
+                  setupSaveSuccess ||
+                  (protectionStatus?.has_devices
+                    ? 'Desktop connected. Monitoring modules available.'
+                    : null)
+                }
+                recentAlerts={alerts}
+                runtimeStatus={runtimeStatus}
+                monitorControl={monitorControl}
+                onSave={saveSetupPreferences}
+                isDesktopRuntime={isDesktopRuntime}
+              />
+              <ResourceMonitor stats={liveStats} />
+              <Recommendations
+                recommendations={isDesktopRuntime ? recommendations : mockRecommendations}
+                onSelect={(recommendation) => injectRecommendationContext(recommendation)}
+              />
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

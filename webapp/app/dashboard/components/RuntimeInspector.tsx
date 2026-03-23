@@ -70,8 +70,8 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
   }, [timelineEvents]);
 
   return (
-    <section className="mt-4 rounded-2xl border border-gray-700 bg-gray-900/70 p-4">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-3">
+      <div className="mb-2 flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-300">Runtime Inspector</h2>
           <p className="text-xs text-gray-500">Live file/process/network activity on this device.</p>
@@ -87,8 +87,8 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
       </div>
 
       {isDesktopRuntime && monitorControl && (
-        <div className="mb-3 rounded-lg border border-gray-700 bg-gray-800/70 p-3 text-xs text-gray-300">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Monitor Lifecycle</p>
+        <div className="mb-2 rounded-lg border border-gray-700 bg-gray-800/70 p-2 text-xs text-gray-300">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Monitor Lifecycle</p>
           <div className="grid gap-1 sm:grid-cols-3">
             {(['file', 'process', 'network'] as const).map((module) => (
               <div key={module} className="rounded border border-gray-700 bg-gray-900/70 p-2">
@@ -106,7 +106,7 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
       )}
 
       {isDesktopRuntime && permissionHints?.maybe_blocked && (
-        <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+        <div className="mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
           <div className="mb-1 inline-flex items-center gap-1 font-medium">
             <AlertTriangle className="h-3.5 w-3.5" />
             Permissions likely blocking telemetry
@@ -131,8 +131,8 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
         </div>
       )}
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-3 xl:col-span-2">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Live Event Timeline</p>
             <div className="flex items-center gap-1">
@@ -152,7 +152,7 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
               ))}
             </div>
           </div>
-          <div ref={timelineRef} className="max-h-52 space-y-1 overflow-y-auto text-xs">
+          <div ref={timelineRef} className="max-h-[30rem] space-y-1 overflow-y-auto text-xs">
             {timelineEvents.map((event) => (
               <div key={event.id} className="rounded border border-gray-700 bg-gray-900/70 p-2">
                 <div className="mb-0.5 flex items-center justify-between gap-2">
@@ -177,17 +177,82 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">File Activity</p>
-          <p className="mb-2 text-xs text-gray-400">Events observed: {details?.file.event_count ?? 0}</p>
-          <div className="max-h-44 space-y-1 overflow-y-auto text-xs text-gray-300">
-            {(details?.file.recent_events || []).slice(-12).reverse().map((event, idx) => (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Active Process Snapshot</p>
+            <div className="max-h-36 overflow-y-auto text-xs text-gray-300">
+              <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-700 pb-1 text-[11px] text-gray-500">
+                <span>Process</span>
+                <span>PID</span>
+              </div>
+              {(details?.process.active_processes || []).slice(0, 16).map((proc, idx) => (
+                <div key={`${proc.pid}-${idx}`} className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-800 py-1">
+                  <span className="truncate text-gray-100">{proc.name || 'unknown'}</span>
+                  <span className="text-gray-400">{proc.pid ?? 'n/a'}</span>
+                </div>
+              ))}
+              {(!details?.process.active_processes || details.process.active_processes.length === 0) && (
+                <p className="py-2 text-gray-500">No active process snapshot yet.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Active Network Connections</p>
+            <div className="max-h-36 overflow-y-auto text-xs text-gray-300">
+              <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-700 pb-1 text-[11px] text-gray-500">
+                <span>Destination</span>
+                <span>Port</span>
+              </div>
+              {(details?.network.active_connections || []).slice(0, 16).map((conn, idx) => (
+                <div
+                  key={`${conn.pid}-${conn.remote_ip}-${conn.remote_port}-${idx}`}
+                  className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-800 py-1"
+                >
+                  <span className="truncate text-gray-100">{conn.hostname || conn.remote_ip || 'unknown'}</span>
+                  <span className="text-gray-400">{conn.remote_port ?? 'n/a'}</span>
+                </div>
+              ))}
+              {(!details?.network.active_connections || details.network.active_connections.length === 0) && (
+                <p className="py-2 text-gray-500">No active network snapshot yet.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Top Live Processes</p>
+            <div className="max-h-28 overflow-y-auto text-xs text-gray-300">
+              <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-gray-700 pb-1 text-[11px] text-gray-500">
+                <span>Process</span>
+                <span>CPU%</span>
+                <span>Mem%</span>
+              </div>
+              {(details?.process.top_processes || []).slice(0, 8).map((proc, idx) => (
+                <div key={`${proc.pid}-${idx}`} className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-gray-800 py-1">
+                  <span className="truncate text-gray-100">{proc.name || 'unknown'}</span>
+                  <span>{(proc.cpu_percent || 0).toFixed(1)}</span>
+                  <span>{(proc.memory_percent || 0).toFixed(1)}</span>
+                </div>
+              ))}
+              {(!details?.process.top_processes || details.process.top_processes.length === 0) && (
+                <p className="py-2 text-gray-500">No process telemetry yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">File Activity</p>
+          <p className="mb-1 text-xs text-gray-400">Events observed: {details?.file.event_count ?? 0}</p>
+          <div className="max-h-36 space-y-1 overflow-y-auto text-xs text-gray-300">
+            {(details?.file.recent_events || []).slice(-8).reverse().map((event, idx) => (
               <div key={`${event.path}-${idx}`} className="rounded border border-gray-700 bg-gray-900/70 p-2">
-                <p className="font-medium text-gray-100">{event.filename || event.path || 'Unknown file'}</p>
-                <p className="text-gray-400">
+                <p className="truncate font-medium text-gray-100">{event.filename || event.path || 'Unknown file'}</p>
+                <p className="truncate text-gray-400">
                   {event.type || 'event'} · {event.extension || 'n/a'} · {event.size || 0} bytes
                 </p>
-                <p className="text-gray-500">{formatTime(event.timestamp)}</p>
               </div>
             ))}
             {(!details?.file.recent_events || details.file.recent_events.length === 0) && (
@@ -196,17 +261,16 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Process Activity</p>
-          <p className="mb-2 text-xs text-gray-400">New process events: {details?.process.event_count ?? 0}</p>
-          <div className="max-h-44 space-y-1 overflow-y-auto text-xs text-gray-300">
-            {(details?.process.recent_events || []).slice(-12).reverse().map((event, idx) => (
+        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Process Activity</p>
+          <p className="mb-1 text-xs text-gray-400">New process events: {details?.process.event_count ?? 0}</p>
+          <div className="max-h-36 space-y-1 overflow-y-auto text-xs text-gray-300">
+            {(details?.process.recent_events || []).slice(-8).reverse().map((event, idx) => (
               <div key={`${event.pid}-${idx}`} className="rounded border border-gray-700 bg-gray-900/70 p-2">
-                <p className="font-medium text-gray-100">
+                <p className="truncate font-medium text-gray-100">
                   {event.name || 'unknown'} <span className="text-gray-500">PID {event.pid ?? 'n/a'}</span>
                 </p>
-                <p className="text-gray-400">Parent: {event.parent_name || 'unknown'}</p>
-                <p className="text-gray-500">{formatTime(event.create_time)}</p>
+                <p className="truncate text-gray-400">Parent: {event.parent_name || 'unknown'}</p>
               </div>
             ))}
             {(!details?.process.recent_events || details.process.recent_events.length === 0) && (
@@ -215,85 +279,22 @@ export function RuntimeInspector({ runtimeStatus, isDesktopRuntime, monitorContr
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Active Process Snapshot</p>
-          <div className="max-h-44 overflow-y-auto text-xs text-gray-300">
-            <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-700 pb-1 text-[11px] text-gray-500">
-              <span>Process</span>
-              <span>PID</span>
-            </div>
-            {(details?.process.active_processes || []).slice(0, 24).map((proc, idx) => (
-              <div key={`${proc.pid}-${idx}`} className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-800 py-1">
-                <span className="truncate text-gray-100">{proc.name || 'unknown'}</span>
-                <span className="text-gray-400">{proc.pid ?? 'n/a'}</span>
-              </div>
-            ))}
-            {(!details?.process.active_processes || details.process.active_processes.length === 0) && (
-              <p className="py-2 text-gray-500">No active process snapshot yet.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Top Live Processes</p>
-          <div className="max-h-44 overflow-y-auto text-xs text-gray-300">
-            <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-gray-700 pb-1 text-[11px] text-gray-500">
-              <span>Process</span>
-              <span>CPU%</span>
-              <span>Mem%</span>
-            </div>
-            {(details?.process.top_processes || []).slice(0, 12).map((proc, idx) => (
-              <div key={`${proc.pid}-${idx}`} className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-gray-800 py-1">
-                <span className="truncate text-gray-100">{proc.name || 'unknown'}</span>
-                <span>{(proc.cpu_percent || 0).toFixed(1)}</span>
-                <span>{(proc.memory_percent || 0).toFixed(1)}</span>
-              </div>
-            ))}
-            {(!details?.process.top_processes || details.process.top_processes.length === 0) && (
-              <p className="py-2 text-gray-500">No process telemetry yet.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Network Activity</p>
-          <p className="mb-2 text-xs text-gray-400">New network events: {details?.network.event_count ?? 0}</p>
-          <div className="max-h-44 space-y-1 overflow-y-auto text-xs text-gray-300">
-            {(details?.network.recent_events || []).slice(-12).reverse().map((event, idx) => (
+        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-2">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Network Activity</p>
+          <p className="mb-1 text-xs text-gray-400">New network events: {details?.network.event_count ?? 0}</p>
+          <div className="max-h-36 space-y-1 overflow-y-auto text-xs text-gray-300">
+            {(details?.network.recent_events || []).slice(-8).reverse().map((event, idx) => (
               <div key={`${event.pid}-${event.remote_ip}-${idx}`} className="rounded border border-gray-700 bg-gray-900/70 p-2">
-                <p className="font-medium text-gray-100">
+                <p className="truncate font-medium text-gray-100">
                   {event.process_name || 'unknown'} <span className="text-gray-500">PID {event.pid ?? 'n/a'}</span>
                 </p>
-                <p className="text-gray-400">
+                <p className="truncate text-gray-400">
                   {event.hostname || event.remote_ip || 'unknown host'}:{event.remote_port ?? 'n/a'}
                 </p>
-                <p className="text-gray-500">{formatTime(event.timestamp)}</p>
               </div>
             ))}
             {(!details?.network.recent_events || details.network.recent_events.length === 0) && (
               <p className="text-gray-500">No network events yet.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-gray-700 bg-gray-800/70 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Active Network Connections</p>
-          <div className="max-h-44 overflow-y-auto text-xs text-gray-300">
-            <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-700 pb-1 text-[11px] text-gray-500">
-              <span>Destination</span>
-              <span>Port</span>
-            </div>
-            {(details?.network.active_connections || []).slice(0, 24).map((conn, idx) => (
-              <div
-                key={`${conn.pid}-${conn.remote_ip}-${conn.remote_port}-${idx}`}
-                className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-800 py-1"
-              >
-                <span className="truncate text-gray-100">{conn.hostname || conn.remote_ip || 'unknown'}</span>
-                <span className="text-gray-400">{conn.remote_port ?? 'n/a'}</span>
-              </div>
-            ))}
-            {(!details?.network.active_connections || details.network.active_connections.length === 0) && (
-              <p className="py-2 text-gray-500">No active network snapshot yet.</p>
             )}
           </div>
         </div>

@@ -26,13 +26,13 @@ export function HealthScore({ score }: HealthScoreProps) {
   const offset = circumference - (normalized / 100) * circumference;
 
   return (
-    <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-4">
+    <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-3">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
         Security Health Score
       </h2>
-      <div className="mt-4 flex items-center justify-center">
-        <div className="relative h-32 w-32">
-          <svg className="h-32 w-32 -rotate-90" viewBox="0 0 120 120">
+      <div className="mt-2 flex items-center justify-center">
+        <div className="relative h-20 w-20">
+          <svg className="h-20 w-20 -rotate-90" viewBox="0 0 120 120">
             <circle
               cx="60"
               cy="60"
@@ -54,8 +54,8 @@ export function HealthScore({ score }: HealthScoreProps) {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <p className={`text-3xl font-bold ${scoreColor(normalized)}`}>{normalized}</p>
-            <p className="text-xs text-gray-400">{scoreLabel(normalized)}</p>
+            <p className={`text-xl font-bold ${scoreColor(normalized)}`}>{normalized}</p>
+            <p className="text-[11px] text-gray-400">{scoreLabel(normalized)}</p>
           </div>
         </div>
       </div>

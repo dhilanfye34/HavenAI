@@ -37,7 +37,7 @@ export function ChatPanel({
   }, [messages, isResponding]);
 
   return (
-    <section className="flex h-[calc(100vh-10rem)] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-900/80">
+    <section className="flex h-[calc(100vh-11rem)] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-900/80">
       <div className="border-b border-gray-700 bg-gray-800/80 px-4 py-3">
         <div className="flex items-center justify-between">
           <div>

@@ -22,11 +22,11 @@ function UsageBar({ label, value }: { label: string; value: number }) {
 
 export function ResourceMonitor({ stats }: ResourceMonitorProps) {
   return (
-    <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-4">
+    <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-3">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
         Storage & Resources
       </h2>
-      <div className="mt-3 space-y-3">
+      <div className="mt-2 space-y-2">
         <UsageBar label="Disk Usage" value={stats.diskUsage} />
         <UsageBar label="Memory Usage" value={stats.memoryUsage} />
         <UsageBar label="CPU Usage" value={stats.cpuUsage} />

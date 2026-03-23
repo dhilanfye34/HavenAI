@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Activity, Lock, Save } from 'lucide-react';
+import { Activity, ChevronDown, ChevronUp, Lock, Save } from 'lucide-react';
 
 import {
   MonitorControlState,
@@ -145,6 +145,7 @@ export function SetupPanel({
   const [voicePhoneDraft, setVoicePhoneDraft] = useState('');
   const [smsPhoneError, setSmsPhoneError] = useState<string | null>(null);
   const [voicePhoneError, setVoicePhoneError] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     setSmsPhoneDraft(preferences?.sms_phone ?? '');
@@ -203,6 +204,11 @@ export function SetupPanel({
   const fileBlockers = monitorControl?.blockers.file || [];
   const processBlockers = monitorControl?.blockers.process || [];
   const networkBlockers = monitorControl?.blockers.network || [];
+  const enabledCloudChannels = [
+    preferences.email_enabled,
+    preferences.sms_enabled,
+    preferences.voice_call_enabled,
+  ].filter(Boolean).length;
 
   const validateAndSaveSmsPhone = async () => {
     const normalized = normalizePhone(smsPhoneDraft);
@@ -225,14 +231,12 @@ export function SetupPanel({
   };
 
   return (
-    <section className="mb-4 rounded-2xl border border-gray-700 bg-gray-900/70 p-4">
-      <div className="mb-3">
+    <section className="rounded-2xl border border-gray-700 bg-gray-900/70 p-3">
+      <div className="mb-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
-          Setup and Monitoring
+          Monitor Controls
         </h2>
-        <p className="text-xs text-gray-500">
-          Configure desktop monitors and cloud alert channels.
-        </p>
+        <p className="text-xs text-gray-500">Fast access to monitor toggles and permission state.</p>
       </div>
 
       {desktopLocked && (
@@ -251,7 +255,7 @@ export function SetupPanel({
       )}
 
       {isDesktopRuntime && (
-        <div className="mb-3 rounded-lg border border-cyan-500/40 bg-cyan-500/10 p-3 text-xs text-cyan-200">
+        <div className="mb-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 p-2 text-xs text-cyan-200">
           <div className="mb-1 inline-flex items-center gap-1 font-medium">
             <Activity className="h-3.5 w-3.5" />
             Desktop runtime connected
@@ -260,7 +264,7 @@ export function SetupPanel({
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
           Desktop Monitoring
         </p>
@@ -350,115 +354,127 @@ export function SetupPanel({
         )}
       </div>
 
-      <div className="mt-4 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-          Cloud Alerts
-        </p>
-        <ToggleRow
-          label="Email Alerts"
-          description="Receive alerts by account email."
-          checked={preferences.email_enabled}
-          disabled={saving}
-          onToggle={(checked) => onSave({ email_enabled: checked })}
-        />
-        <ToggleRow
-          label="SMS Alerts"
-          description="Receive high-priority alerts via text message."
-          checked={preferences.sms_enabled}
-          disabled={saving}
-          onToggle={async (checked) => {
-            if (checked) {
-              const normalized = normalizePhone(smsPhoneDraft || preferences.sms_phone || '');
-              if (!normalized) {
-                setSmsPhoneError('Add a valid SMS phone before enabling SMS alerts.');
-                return;
-              }
-              setSmsPhoneError(null);
-              if (normalized !== preferences.sms_phone) {
-                await onSave({ sms_phone: normalized });
-              }
-            }
-            await onSave({ sms_enabled: checked });
-          }}
-        />
-        {preferences.sms_enabled && (
-          <div className="space-y-2">
-            <input
-              value={smsPhoneDraft}
-              placeholder="+1 305 555 1234"
-              onChange={(event) => setSmsPhoneDraft(event.target.value)}
-              onBlur={validateAndSaveSmsPhone}
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
+      <div className="mt-2 rounded-lg border border-gray-700 bg-gray-800/60">
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen((value) => !value)}
+          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-gray-300"
+        >
+          <span>
+            Advanced alert channels
+            <span className="ml-2 text-[11px] text-gray-500">{enabledCloudChannels}/3 enabled</span>
+          </span>
+          {advancedOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+        {advancedOpen && (
+          <div className="space-y-2 border-t border-gray-700 px-2 pb-2 pt-2">
+            <ToggleRow
+              label="Email Alerts"
+              description="Receive alerts by account email."
+              checked={preferences.email_enabled}
+              disabled={saving}
+              onToggle={(checked) => onSave({ email_enabled: checked })}
             />
-            <select
-              value={preferences.sms_min_severity}
-              onChange={(event) =>
-                onSave({
-                  sms_min_severity: event.target.value as
-                    | 'low'
-                    | 'medium'
-                    | 'high'
-                    | 'critical',
-                })
-              }
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
-            >
-              <option value="low">SMS threshold: low+</option>
-              <option value="medium">SMS threshold: medium+</option>
-              <option value="high">SMS threshold: high+</option>
-              <option value="critical">SMS threshold: critical only</option>
-            </select>
-            {smsPhoneError && <p className="text-xs text-red-300">{smsPhoneError}</p>}
-          </div>
-        )}
-        <ToggleRow
-          label="Phone Call Alerts"
-          description="Receive critical alerts as automated calls."
-          checked={preferences.voice_call_enabled}
-          disabled={saving}
-          onToggle={async (checked) => {
-            if (checked) {
-              const normalized = normalizePhone(voicePhoneDraft || preferences.voice_phone || '');
-              if (!normalized) {
-                setVoicePhoneError('Add a valid phone before enabling call alerts.');
-                return;
-              }
-              setVoicePhoneError(null);
-              if (normalized !== preferences.voice_phone) {
-                await onSave({ voice_phone: normalized });
-              }
-            }
-            await onSave({ voice_call_enabled: checked });
-          }}
-        />
-        {preferences.voice_call_enabled && (
-          <div className="space-y-2">
-            <input
-              value={voicePhoneDraft}
-              placeholder="+1 305 555 5678"
-              onChange={(event) => setVoicePhoneDraft(event.target.value)}
-              onBlur={validateAndSaveVoicePhone}
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
+            <ToggleRow
+              label="SMS Alerts"
+              description="Receive high-priority alerts via text message."
+              checked={preferences.sms_enabled}
+              disabled={saving}
+              onToggle={async (checked) => {
+                if (checked) {
+                  const normalized = normalizePhone(smsPhoneDraft || preferences.sms_phone || '');
+                  if (!normalized) {
+                    setSmsPhoneError('Add a valid SMS phone before enabling SMS alerts.');
+                    return;
+                  }
+                  setSmsPhoneError(null);
+                  if (normalized !== preferences.sms_phone) {
+                    await onSave({ sms_phone: normalized });
+                  }
+                }
+                await onSave({ sms_enabled: checked });
+              }}
             />
-            <select
-              value={preferences.voice_call_min_severity}
-              onChange={(event) =>
-                onSave({
-                  voice_call_min_severity: event.target.value as
-                    | 'low'
-                    | 'medium'
-                    | 'high'
-                    | 'critical',
-                })
-              }
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
-            >
-              <option value="low">Call threshold: low+</option>
-              <option value="medium">Call threshold: medium+</option>
-              <option value="high">Call threshold: high+</option>
-              <option value="critical">Call threshold: critical only</option>
-            </select>
-            {voicePhoneError && <p className="text-xs text-red-300">{voicePhoneError}</p>}
+            {preferences.sms_enabled && (
+              <div className="space-y-2">
+                <input
+                  value={smsPhoneDraft}
+                  placeholder="+1 305 555 1234"
+                  onChange={(event) => setSmsPhoneDraft(event.target.value)}
+                  onBlur={validateAndSaveSmsPhone}
+                  className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
+                />
+                <select
+                  value={preferences.sms_min_severity}
+                  onChange={(event) =>
+                    onSave({
+                      sms_min_severity: event.target.value as
+                        | 'low'
+                        | 'medium'
+                        | 'high'
+                        | 'critical',
+                    })
+                  }
+                  className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
+                >
+                  <option value="low">SMS threshold: low+</option>
+                  <option value="medium">SMS threshold: medium+</option>
+                  <option value="high">SMS threshold: high+</option>
+                  <option value="critical">SMS threshold: critical only</option>
+                </select>
+                {smsPhoneError && <p className="text-xs text-red-300">{smsPhoneError}</p>}
+              </div>
+            )}
+            <ToggleRow
+              label="Phone Call Alerts"
+              description="Receive critical alerts as automated calls."
+              checked={preferences.voice_call_enabled}
+              disabled={saving}
+              onToggle={async (checked) => {
+                if (checked) {
+                  const normalized = normalizePhone(voicePhoneDraft || preferences.voice_phone || '');
+                  if (!normalized) {
+                    setVoicePhoneError('Add a valid phone before enabling call alerts.');
+                    return;
+                  }
+                  setVoicePhoneError(null);
+                  if (normalized !== preferences.voice_phone) {
+                    await onSave({ voice_phone: normalized });
+                  }
+                }
+                await onSave({ voice_call_enabled: checked });
+              }}
+            />
+            {preferences.voice_call_enabled && (
+              <div className="space-y-2">
+                <input
+                  value={voicePhoneDraft}
+                  placeholder="+1 305 555 5678"
+                  onChange={(event) => setVoicePhoneDraft(event.target.value)}
+                  onBlur={validateAndSaveVoicePhone}
+                  className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
+                />
+                <select
+                  value={preferences.voice_call_min_severity}
+                  onChange={(event) =>
+                    onSave({
+                      voice_call_min_severity: event.target.value as
+                        | 'low'
+                        | 'medium'
+                        | 'high'
+                        | 'critical',
+                    })
+                  }
+                  className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-200 outline-none focus:border-cyan-400"
+                >
+                  <option value="low">Call threshold: low+</option>
+                  <option value="medium">Call threshold: medium+</option>
+                  <option value="high">Call threshold: high+</option>
+                  <option value="critical">Call threshold: critical only</option>
+                </select>
+                {voicePhoneError && <p className="text-xs text-red-300">{voicePhoneError}</p>}
+              </div>
+            )}
           </div>
         )}
       </div>
