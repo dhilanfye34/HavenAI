@@ -67,3 +67,5 @@ htmlcov/
 *.key
 # Electron build artifacts
 desktop-app/electron/release/
+
+desktop-app/electron/release/mac-arm64/
