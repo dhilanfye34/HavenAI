@@ -2,15 +2,18 @@ import Link from 'next/link';
 import { Users, GraduationCap, Target, Lightbulb, ArrowRight } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import { WaveShader } from '../components/WaveShader';
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="relative min-h-screen bg-[#0a0a0f] text-white">
+      <div className="absolute top-0 left-0 h-screen w-full" style={{ zIndex: 0 }}>
+        <WaveShader />
+      </div>
+      <div className="relative" style={{ zIndex: 1 }}>
       <Navbar />
 
       <section className="relative overflow-hidden pt-32 pb-20">
-        <div className="stars-field -z-10" />
-        <div className="hero-orb -z-10" style={{ top: '30%', opacity: 0.4 }} />
 
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="section-badge mb-6 justify-center">About Us</div>
@@ -28,7 +31,7 @@ export default function AboutPage() {
       <section className="py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid gap-6 md:grid-cols-2">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:border-white/[0.12]">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm p-8 transition-all duration-300 hover:border-white/[0.12]">
               <div className="mb-4 inline-flex rounded-xl bg-violet-500/[0.08] p-3 text-violet-400">
                 <Target className="h-6 w-6" />
               </div>
@@ -40,7 +43,7 @@ export default function AboutPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:border-white/[0.12]">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm p-8 transition-all duration-300 hover:border-white/[0.12]">
               <div className="mb-4 inline-flex rounded-xl bg-cyan-500/[0.08] p-3 text-cyan-400">
                 <Lightbulb className="h-6 w-6" />
               </div>
@@ -52,7 +55,7 @@ export default function AboutPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:border-white/[0.12]">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm p-8 transition-all duration-300 hover:border-white/[0.12]">
               <div className="mb-4 inline-flex rounded-xl bg-emerald-500/[0.08] p-3 text-emerald-400">
                 <GraduationCap className="h-6 w-6" />
               </div>
@@ -64,7 +67,7 @@ export default function AboutPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:border-white/[0.12]">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm p-8 transition-all duration-300 hover:border-white/[0.12]">
               <div className="mb-4 inline-flex rounded-xl bg-amber-500/[0.08] p-3 text-amber-400">
                 <Users className="h-6 w-6" />
               </div>
@@ -79,8 +82,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="py-24">
-        <div className="bg-top-glow absolute inset-0 -z-10" />
+      <section className="relative py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-16 text-center">
             <div className="section-badge mb-6 justify-center">Technology</div>
@@ -95,7 +97,7 @@ export default function AboutPage() {
               { label: 'Web Dashboard', tech: 'Next.js + React', desc: 'Real-time command center and alert management' },
               { label: 'Backend', tech: 'FastAPI + PostgreSQL', desc: 'Authentication, device sync, and alert routing' },
             ].map((item) => (
-              <div key={item.label} className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.04]">
+              <div key={item.label} className="group rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm p-6 transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.05]">
                 <p className="text-xs font-semibold uppercase tracking-wider text-violet-400">{item.label}</p>
                 <p className="mt-2 text-lg font-semibold text-white">{item.tech}</p>
                 <p className="mt-1 text-sm text-gray-500">{item.desc}</p>
@@ -124,6 +126,7 @@ export default function AboutPage() {
       </section>
 
       <Footer />
+      </div>
     </div>
   );
 }

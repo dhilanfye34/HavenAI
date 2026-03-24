@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import { DottedSurface } from '../components/DottedSurface';
 
 const CORE_AGENTS = [
   {
@@ -70,7 +71,9 @@ const PLATFORM_FEATURES = [
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="relative min-h-screen bg-[#0a0a0f] text-white">
+      <DottedSurface className="opacity-40" />
+      <div className="relative" style={{ zIndex: 1 }}>
       <Navbar />
 
       <section className="relative overflow-hidden pt-32 pb-20">
@@ -168,6 +171,7 @@ export default function FeaturesPage() {
       </section>
 
       <Footer />
+      </div>
     </div>
   );
 }
