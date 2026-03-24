@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { ShaderBackground } from './components/ShaderBackground';
+import { SmokeBackground } from './components/SmokeBackground';
 
 const BENEFITS = [
   {
@@ -71,13 +73,12 @@ export default function Home() {
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       <Navbar />
 
-      {/* ── Hero with orb ────────────────────────────────── */}
+      {/* ── Hero with shader background ────────────────── */}
       <section className="relative overflow-hidden pt-32 pb-32 lg:pt-44 lg:pb-44">
-        <div className="stars-field -z-10" />
-        <div className="hero-orb -z-10" />
-        <div className="hero-orb-ring -z-10" />
+        <ShaderBackground className="opacity-70" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0a0f]/30 via-transparent to-[#0a0a0f]" style={{ zIndex: 1 }} />
 
-        <div className="relative mx-auto max-w-4xl px-6 text-center">
+        <div className="relative mx-auto max-w-4xl px-6 text-center" style={{ zIndex: 2 }}>
           <div className="section-badge mb-8">
             <Shield className="h-4 w-4" />
             AI-Powered Cybersecurity
@@ -120,9 +121,13 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Smoke background for lower sections ──────────── */}
+      <div className="relative">
+        <SmokeBackground className="opacity-50" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0a0f] via-transparent to-[#0a0a0f]" style={{ zIndex: 1 }} />
+
       {/* ── Agents showcase (alternating layout) ─────────── */}
-      <section className="relative py-28">
-        <div className="bg-top-glow absolute inset-0 -z-10" />
+      <section className="relative py-28" style={{ zIndex: 2 }}>
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-20 text-center">
             <div className="section-badge mb-6 justify-center">Our Agents</div>
@@ -179,7 +184,7 @@ export default function Home() {
       </section>
 
       {/* ── Benefits grid ────────────────────────────────── */}
-      <section className="relative py-28">
+      <section className="relative py-28" style={{ zIndex: 2 }}>
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-20 text-center">
             <div className="section-badge mb-6 justify-center">Key Benefits</div>
@@ -212,7 +217,7 @@ export default function Home() {
       </section>
 
       {/* ── CTA ──────────────────────────────────────────── */}
-      <section className="relative py-28">
+      <section className="relative py-28" style={{ zIndex: 2 }}>
         <div className="absolute inset-0 -z-10">
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-500/[0.03] to-transparent" />
         </div>
@@ -234,6 +239,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      </div>{/* end smoke wrapper */}
 
       <Footer />
     </div>

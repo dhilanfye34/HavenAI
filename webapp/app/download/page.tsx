@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import { ShaderHeroCanvas } from '../components/ShaderHeroCanvas';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -103,14 +104,13 @@ export default function DownloadPage() {
     : [];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="relative min-h-screen bg-[#0a0a0f] text-white">
+      <ShaderHeroCanvas className="opacity-40 fixed" />
+      <div className="relative" style={{ zIndex: 1 }}>
       <Navbar />
 
       {/* Hero */}
       <section className="relative overflow-hidden pt-32 pb-12">
-        <div className="stars-field -z-10" />
-        <div className="hero-orb -z-10" style={{ top: '35%', opacity: 0.3 }} />
-
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="section-badge mb-6 justify-center">
             <Download className="h-4 w-4" />
@@ -270,6 +270,7 @@ export default function DownloadPage() {
       </section>
 
       <Footer />
+      </div>
     </div>
   );
 }
