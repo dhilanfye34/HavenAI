@@ -1,13 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Shield, Loader2 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -56,7 +54,9 @@ export default function LoginPage() {
         });
       }
 
-      router.push('/');
+      // Reload so page.tsx detects the token and renders the dashboard.
+      // router.push('/') breaks on file:// protocol in packaged Electron.
+      window.location.reload();
     } catch (err: any) {
       setError(err.message || 'Failed to fetch');
     } finally {
