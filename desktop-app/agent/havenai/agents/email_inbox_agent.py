@@ -225,6 +225,30 @@ class EmailInboxAgent(Agent):
         except Exception:
             return ""
 
+    @staticmethod
+    def test_connection(host: str, port: int, user: str, password: str) -> Dict[str, Any]:
+        """Test IMAP connection with provided credentials. Returns {success, message, unread_count}."""
+        try:
+            with imaplib.IMAP4_SSL(host, port) as mail:
+                mail.login(user, password)
+                mail.select("INBOX", readonly=True)
+                status, msg_nums = mail.search(None, "UNSEEN")
+                unread = len(msg_nums[0].split()) if status == "OK" and msg_nums[0] else 0
+                return {"success": True, "message": f"Connected. {unread} unread messages.", "unread_count": unread}
+        except imaplib.IMAP4.error as e:
+            return {"success": False, "message": f"Authentication failed: {e}"}
+        except Exception as e:
+            return {"success": False, "message": f"Connection failed: {e}"}
+
+    def configure(self, host: str, port: int, user: str, password: str) -> None:
+        """Hot-reload IMAP credentials without restarting the agent."""
+        self.imap_host = host
+        self.imap_port = port
+        self.imap_user = user
+        self.imap_password = password
+        self._seen_ids.clear()
+        logger.info(f"EmailInboxAgent reconfigured for {user}@{host}")
+
     def _get_recommendation(self, risk_score: float) -> str:
         if risk_score >= 0.8:
             return "Do not click links or attachments. Mark this message as phishing."

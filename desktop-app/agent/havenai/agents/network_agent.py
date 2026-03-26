@@ -74,8 +74,8 @@ class NetworkAgent(Agent):
     - Potential data exfiltration
     """
     
-    def __init__(self, shared_context: Dict[str, Any], alert_queue: Queue):
-        super().__init__(shared_context, alert_queue, name="NetworkAgent")
+    def __init__(self, shared_context: Dict[str, Any], alert_queue: Queue, local_db=None):
+        super().__init__(shared_context, alert_queue, name="NetworkAgent", local_db=local_db)
         
         # Track connections we've already seen
         self.known_connections: Set[tuple] = set()
@@ -259,6 +259,9 @@ class NetworkAgent(Agent):
                     "recommendation": finding["recommendation"]
                 }
             })
+
+        for event_data in self.shared_context.get(self.name, {}).get("recent_network_events", []):
+            self.store_event("network", event_data)
     
     def _analyze_connection(self, conn: Dict[str, Any]) -> tuple[float, List[str]]:
         """

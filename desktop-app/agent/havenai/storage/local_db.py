@@ -1,0 +1,262 @@
+"""
+Local SQLite storage for HavenAI desktop agent.
+
+All raw telemetry events and alerts are persisted locally first.
+Only medium+ severity alerts are synced to the cloud backend.
+Data is pruned on a 7-day rolling window.
+"""
+
+import json
+import logging
+import os
+import sqlite3
+import time
+import uuid
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+
+_DB_DIR = Path.home() / ".havenai"
+_DB_PATH = _DB_DIR / "havenai.db"
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    timestamp REAL NOT NULL,
+    data TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_kind_ts ON events (kind, timestamp);
+
+CREATE TABLE IF NOT EXISTS alerts (
+    id TEXT PRIMARY KEY,
+    agent TEXT,
+    type TEXT,
+    severity TEXT,
+    title TEXT,
+    description TEXT,
+    details TEXT,
+    risk_score REAL,
+    created_at REAL NOT NULL,
+    is_resolved INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_severity_ts ON alerts (severity, created_at);
+
+CREATE TABLE IF NOT EXISTS agent_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_name TEXT NOT NULL,
+    timestamp REAL NOT NULL,
+    context TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshots_agent_ts ON agent_snapshots (agent_name, timestamp);
+"""
+
+
+class LocalDB:
+    """Thin wrapper around a per-user SQLite database."""
+
+    def __init__(self, db_path: Optional[str] = None):
+        path = Path(db_path) if db_path else _DB_PATH
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._path = str(path)
+        self._init_schema()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self._path, timeout=5)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        return conn
+
+    def _init_schema(self) -> None:
+        try:
+            with self._connect() as conn:
+                conn.executescript(_SCHEMA)
+        except Exception as e:
+            logger.error("LocalDB schema init failed: %s", e)
+
+    # ------------------------------------------------------------------
+    # Events
+    # ------------------------------------------------------------------
+
+    def insert_event(self, kind: str, data: Dict[str, Any]) -> None:
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    "INSERT INTO events (kind, timestamp, data) VALUES (?, ?, ?)",
+                    (kind, time.time(), json.dumps(data, default=str)),
+                )
+        except Exception as e:
+            logger.debug("insert_event failed: %s", e)
+
+    def query_events(
+        self,
+        kind: Optional[str] = None,
+        since: Optional[float] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        try:
+            clauses: List[str] = []
+            params: List[Any] = []
+            if kind:
+                clauses.append("kind = ?")
+                params.append(kind)
+            if since:
+                clauses.append("timestamp >= ?")
+                params.append(since)
+            where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+            sql = f"SELECT * FROM events {where} ORDER BY timestamp DESC LIMIT ?"
+            params.append(limit)
+
+            with self._connect() as conn:
+                rows = conn.execute(sql, params).fetchall()
+            return [
+                {
+                    "id": r["id"],
+                    "kind": r["kind"],
+                    "timestamp": r["timestamp"],
+                    "data": json.loads(r["data"]),
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.debug("query_events failed: %s", e)
+            return []
+
+    # ------------------------------------------------------------------
+    # Alerts
+    # ------------------------------------------------------------------
+
+    def insert_alert(self, alert: Dict[str, Any]) -> None:
+        try:
+            alert_id = alert.get("id") or str(uuid.uuid4())
+            with self._connect() as conn:
+                conn.execute(
+                    """INSERT OR REPLACE INTO alerts
+                       (id, agent, type, severity, title, description, details, risk_score, created_at, is_resolved)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        alert_id,
+                        alert.get("agent", ""),
+                        alert.get("type", ""),
+                        alert.get("severity", "low"),
+                        alert.get("title", ""),
+                        alert.get("description", ""),
+                        json.dumps(alert.get("details", {}), default=str),
+                        alert.get("risk_score", 0.0),
+                        alert.get("timestamp") or alert.get("created_at") or time.time(),
+                        1 if alert.get("is_resolved") else 0,
+                    ),
+                )
+        except Exception as e:
+            logger.debug("insert_alert failed: %s", e)
+
+    def query_alerts(
+        self,
+        since: Optional[float] = None,
+        severity_min: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        try:
+            clauses: List[str] = []
+            params: List[Any] = []
+            if since:
+                clauses.append("created_at >= ?")
+                params.append(since)
+            if severity_min and severity_min in SEVERITY_RANK:
+                min_rank = SEVERITY_RANK[severity_min]
+                allowed = [s for s, r in SEVERITY_RANK.items() if r >= min_rank]
+                placeholders = ",".join("?" for _ in allowed)
+                clauses.append(f"severity IN ({placeholders})")
+                params.extend(allowed)
+            where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+            sql = f"SELECT * FROM alerts {where} ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+
+            with self._connect() as conn:
+                rows = conn.execute(sql, params).fetchall()
+            return [
+                {
+                    "id": r["id"],
+                    "agent": r["agent"],
+                    "type": r["type"],
+                    "severity": r["severity"],
+                    "title": r["title"],
+                    "description": r["description"],
+                    "details": json.loads(r["details"]) if r["details"] else {},
+                    "risk_score": r["risk_score"],
+                    "created_at": r["created_at"],
+                    "is_resolved": bool(r["is_resolved"]),
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.debug("query_alerts failed: %s", e)
+            return []
+
+    # ------------------------------------------------------------------
+    # Agent snapshots
+    # ------------------------------------------------------------------
+
+    def insert_snapshot(self, agent_name: str, context: Dict[str, Any]) -> None:
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    "INSERT INTO agent_snapshots (agent_name, timestamp, context) VALUES (?, ?, ?)",
+                    (agent_name, time.time(), json.dumps(context, default=str)),
+                )
+        except Exception as e:
+            logger.debug("insert_snapshot failed: %s", e)
+
+    # ------------------------------------------------------------------
+    # Maintenance
+    # ------------------------------------------------------------------
+
+    def prune(self, days: int = 7) -> int:
+        cutoff = time.time() - (days * 86400)
+        total = 0
+        try:
+            with self._connect() as conn:
+                for table, col in [("events", "timestamp"), ("alerts", "created_at"), ("agent_snapshots", "timestamp")]:
+                    cur = conn.execute(f"DELETE FROM {table} WHERE {col} < ?", (cutoff,))
+                    total += cur.rowcount
+            if total:
+                logger.info("LocalDB pruned %d rows older than %d days", total, days)
+        except Exception as e:
+            logger.debug("prune failed: %s", e)
+        return total
+
+    # ------------------------------------------------------------------
+    # Stats
+    # ------------------------------------------------------------------
+
+    def get_stats(self) -> Dict[str, Any]:
+        now = time.time()
+        day_ago = now - 86400
+        week_ago = now - 7 * 86400
+        stats: Dict[str, Any] = {"events_24h": {}, "events_7d": {}, "alerts_24h": {}, "alerts_7d": {}, "total_events": 0, "total_alerts": 0}
+        try:
+            with self._connect() as conn:
+                for label, cutoff in [("24h", day_ago), ("7d", week_ago)]:
+                    rows = conn.execute(
+                        "SELECT kind, COUNT(*) as cnt FROM events WHERE timestamp >= ? GROUP BY kind",
+                        (cutoff,),
+                    ).fetchall()
+                    stats[f"events_{label}"] = {r["kind"]: r["cnt"] for r in rows}
+
+                    rows = conn.execute(
+                        "SELECT severity, COUNT(*) as cnt FROM alerts WHERE created_at >= ? GROUP BY severity",
+                        (cutoff,),
+                    ).fetchall()
+                    stats[f"alerts_{label}"] = {r["severity"]: r["cnt"] for r in rows}
+
+                stats["total_events"] = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+                stats["total_alerts"] = conn.execute("SELECT COUNT(*) FROM alerts").fetchone()[0]
+        except Exception as e:
+            logger.debug("get_stats failed: %s", e)
+        return stats

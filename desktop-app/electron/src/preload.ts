@@ -35,6 +35,13 @@ contextBridge.exposeInMainWorld('havenai', {
   logoutAgent: () => ipcRenderer.invoke('agent-logout'),
   openPermissionsSettings: (target?: 'file' | 'process' | 'network' | 'alerts' | 'all') =>
     ipcRenderer.invoke('open-permissions-settings', target),
+  configureEmailMonitor: (payload: { email: string; password: string; imapHost: string; imapPort: number }) =>
+    ipcRenderer.invoke('configure-email-monitor', payload),
+  queryLocalEvents: (params: { kind?: string; since?: number; limit?: number }) =>
+    ipcRenderer.invoke('query-local-events', params),
+  queryLocalAlerts: (params: { since?: number; severityMin?: string; limit?: number }) =>
+    ipcRenderer.invoke('query-local-alerts', params),
+  getLocalStats: () => ipcRenderer.invoke('get-local-stats'),
 
   // Credentials
   getCredentials: () => ipcRenderer.invoke('get-credentials'),
@@ -59,6 +66,18 @@ contextBridge.exposeInMainWorld('havenai', {
   },
   onMonitorState: (callback: (state: any) => void) => {
     ipcRenderer.on('monitor-state', (_, state) => callback(state));
+  },
+  onEmailConfigResult: (callback: (result: any) => void) => {
+    ipcRenderer.on('email-config-result', (_, result) => callback(result));
+  },
+  onLocalEvents: (callback: (data: any) => void) => {
+    ipcRenderer.on('local-events', (_, data) => callback(data));
+  },
+  onLocalAlerts: (callback: (data: any) => void) => {
+    ipcRenderer.on('local-alerts', (_, data) => callback(data));
+  },
+  onLocalStats: (callback: (data: any) => void) => {
+    ipcRenderer.on('local-stats', (_, data) => callback(data));
   },
 
   // Remove listeners
@@ -112,6 +131,14 @@ declare global {
       onAgentPreferences: (callback: (prefs: any) => void) => void;
       onAgentDevice: (callback: (device: any) => void) => void;
       onMonitorState: (callback: (state: any) => void) => void;
+      onEmailConfigResult: (callback: (result: any) => void) => void;
+      onLocalEvents: (callback: (data: any) => void) => void;
+      onLocalAlerts: (callback: (data: any) => void) => void;
+      onLocalStats: (callback: (data: any) => void) => void;
+      configureEmailMonitor: (payload: { email: string; password: string; imapHost: string; imapPort: number }) => Promise<boolean>;
+      queryLocalEvents: (params: { kind?: string; since?: number; limit?: number }) => Promise<any>;
+      queryLocalAlerts: (params: { since?: number; severityMin?: string; limit?: number }) => Promise<any>;
+      getLocalStats: () => Promise<any>;
       removeAllListeners: (channel: string) => void;
       platform: string;
       isPackaged: boolean;

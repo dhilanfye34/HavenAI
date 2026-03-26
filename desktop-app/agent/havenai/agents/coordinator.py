@@ -25,6 +25,7 @@ from .network_agent import NetworkAgent
 from .email_inbox_agent import EmailInboxAgent
 from .message_agent import MessageAgent
 from havenai.api import get_client
+from havenai.storage.local_db import LocalDB
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,12 @@ class Coordinator:
         self._local_preferences_override = False
         self._started_at = time.time()
         self._alerts_processed = 0
+
+        # Local SQLite storage
+        self.local_db = LocalDB()
+        self.local_db.prune(days=7)
+        self._last_prune = time.time()
+        self._prune_interval = 86400
     
     def initialize_agents(self) -> None:
         """Create all agent instances."""
@@ -159,6 +166,15 @@ class Coordinator:
             # Send heartbeat periodically
             self._maybe_send_heartbeat()
 
+            # Prune old local data daily
+            now = time.time()
+            if now - self._last_prune >= self._prune_interval:
+                try:
+                    self.local_db.prune(days=7)
+                except Exception as e:
+                    logger.debug(f"Periodic prune failed: {e}")
+                self._last_prune = now
+
             time.sleep(0.5)
     
     def _process_alerts(self) -> None:
@@ -173,6 +189,12 @@ class Coordinator:
     def _handle_alert(self, alert: Dict[str, Any]) -> None:
         """Handle a single alert - log, sync to cloud, notify UI."""
         self._alerts_processed += 1
+
+        try:
+            self.local_db.insert_alert(alert)
+        except Exception as e:
+            logger.error(f"Failed to insert alert into local DB: {e}")
+
         # Log the alert
         logger.info(f"Alert from {alert.get('agent', 'unknown')}: {alert.get('type')}")
 
@@ -185,8 +207,13 @@ class Coordinator:
                 except Exception as e:
                     logger.debug(f"Failed to enqueue alert for {agent.name}: {e}")
         
-        # Sync to cloud backend
-        if self.sync_to_cloud and self.api_client and self.api_client.is_authenticated():
+        # Sync medium+ severity alerts to cloud backend
+        if (
+            self.sync_to_cloud
+            and self.api_client
+            and self.api_client.is_authenticated()
+            and alert.get("severity", "low") in ("medium", "high", "critical")
+        ):
             try:
                 self.api_client.send_alert(alert)
             except Exception as e:
@@ -337,7 +364,7 @@ class Coordinator:
             is_running = agent_name in self.monitor_agents
 
             if should_enable and not is_running:
-                agent = agent_cls(self.shared_context, self.alert_queue)
+                agent = agent_cls(self.shared_context, self.alert_queue, local_db=self.local_db)
                 agent.start()
                 self.monitor_agents[agent_name] = agent
                 logger.info(f"Enabled monitor module: {agent_name}")
@@ -698,6 +725,53 @@ class Coordinator:
                     }
                 )
                 self._send_status()
+
+        elif msg_type == "configure_email":
+            data = message.get("data", {})
+            host = data.get("host", "")
+            port = int(data.get("port", 993))
+            user = data.get("user", "")
+            password = data.get("password", "")
+
+            result = EmailInboxAgent.test_connection(host, port, user, password)
+
+            if result["success"]:
+                for agent in self.always_on_agents:
+                    if isinstance(agent, EmailInboxAgent):
+                        agent.configure(host, port, user, password)
+                        break
+                import os
+                os.environ["HAVENAI_IMAP_HOST"] = host
+                os.environ["HAVENAI_IMAP_PORT"] = str(port)
+                os.environ["HAVENAI_IMAP_USER"] = user
+                os.environ["HAVENAI_IMAP_PASSWORD"] = password
+
+            self._send_to_electron({
+                "type": "email-config-result",
+                "data": result
+            })
+
+        elif msg_type == "query_events":
+            data = message.get("data", {})
+            events = self.local_db.query_events(
+                kind=data.get("kind"),
+                since=data.get("since"),
+                limit=data.get("limit", 100),
+            )
+            self._send_to_electron({"type": "local-events", "data": events})
+
+        elif msg_type == "query_alerts":
+            data = message.get("data", {})
+            alerts = self.local_db.query_alerts(
+                since=data.get("since"),
+                severity_min=data.get("severityMin"),
+                limit=data.get("limit", 100),
+            )
+            self._send_to_electron({"type": "local-alerts", "data": alerts})
+
+        elif msg_type == "get_local_stats":
+            stats = self.local_db.get_stats()
+            self._send_to_electron({"type": "local-stats", "data": stats})
 
         elif msg_type == "logout":
             if self.api_client:

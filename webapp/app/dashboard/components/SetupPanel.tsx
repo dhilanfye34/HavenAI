@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Activity, ChevronDown, ChevronUp, Lock, Save } from 'lucide-react';
+import { Activity, ChevronDown, ChevronUp, Lock, Mail, Save } from 'lucide-react';
 
 import {
   MonitorControlState,
@@ -10,6 +10,31 @@ import {
   SetupPreferences,
   SetupPreferencesUpdate,
 } from '../types';
+
+interface EmailProvider {
+  name: string;
+  imapHost: string;
+  imapPort: number;
+  instructionsUrl: string;
+}
+
+const EMAIL_PROVIDERS: Record<string, EmailProvider> = {
+  'gmail.com': { name: 'Google', imapHost: 'imap.gmail.com', imapPort: 993, instructionsUrl: 'https://myaccount.google.com/apppasswords' },
+  'googlemail.com': { name: 'Google', imapHost: 'imap.gmail.com', imapPort: 993, instructionsUrl: 'https://myaccount.google.com/apppasswords' },
+  'outlook.com': { name: 'Microsoft', imapHost: 'outlook.office365.com', imapPort: 993, instructionsUrl: 'https://account.microsoft.com/security' },
+  'hotmail.com': { name: 'Microsoft', imapHost: 'outlook.office365.com', imapPort: 993, instructionsUrl: 'https://account.microsoft.com/security' },
+  'live.com': { name: 'Microsoft', imapHost: 'outlook.office365.com', imapPort: 993, instructionsUrl: 'https://account.microsoft.com/security' },
+  'yahoo.com': { name: 'Yahoo', imapHost: 'imap.mail.yahoo.com', imapPort: 993, instructionsUrl: 'https://login.yahoo.com/account/security#other-apps' },
+  'ymail.com': { name: 'Yahoo', imapHost: 'imap.mail.yahoo.com', imapPort: 993, instructionsUrl: 'https://login.yahoo.com/account/security#other-apps' },
+  'icloud.com': { name: 'Apple', imapHost: 'imap.mail.me.com', imapPort: 993, instructionsUrl: 'https://appleid.apple.com/account/manage' },
+  'me.com': { name: 'Apple', imapHost: 'imap.mail.me.com', imapPort: 993, instructionsUrl: 'https://appleid.apple.com/account/manage' },
+  'mac.com': { name: 'Apple', imapHost: 'imap.mail.me.com', imapPort: 993, instructionsUrl: 'https://appleid.apple.com/account/manage' },
+};
+
+function detectProvider(email: string): EmailProvider | null {
+  const domain = email.split('@')[1]?.toLowerCase();
+  return domain ? EMAIL_PROVIDERS[domain] ?? null : null;
+}
 
 interface SetupPanelProps {
   preferences: SetupPreferences | null;
@@ -146,6 +171,14 @@ export function SetupPanel({
   const [smsPhoneError, setSmsPhoneError] = useState<string | null>(null);
   const [voicePhoneError, setVoicePhoneError] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [emailMonitorOpen, setEmailMonitorOpen] = useState(false);
+  const [emailAddress, setEmailAddress] = useState('');
+  const [appPassword, setAppPassword] = useState('');
+  const [manualImapHost, setManualImapHost] = useState('');
+  const [manualImapPort, setManualImapPort] = useState('993');
+  const [emailTestStatus, setEmailTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [emailTestMessage, setEmailTestMessage] = useState('');
+  const detectedProvider = detectProvider(emailAddress);
 
   useEffect(() => {
     setSmsPhoneDraft(preferences?.sms_phone ?? '');
@@ -228,6 +261,41 @@ export function SetupPanel({
     }
     setVoicePhoneError(null);
     await onSave({ voice_phone: normalized });
+  };
+
+  const handleEmailTest = async () => {
+    const havenai = (window as any).havenai;
+    if (!havenai?.configureEmailMonitor) return;
+
+    const imapHost = detectedProvider?.imapHost || manualImapHost;
+    const imapPort = detectedProvider?.imapPort || parseInt(manualImapPort, 10) || 993;
+
+    if (!emailAddress || !appPassword || !imapHost) {
+      setEmailTestStatus('error');
+      setEmailTestMessage('Please fill in all required fields.');
+      return;
+    }
+
+    setEmailTestStatus('testing');
+    setEmailTestMessage('Testing connection...');
+
+    havenai.configureEmailMonitor({
+      email: emailAddress,
+      password: appPassword,
+      imapHost,
+      imapPort,
+    });
+
+    havenai.onEmailConfigResult?.((result: any) => {
+      if (result?.success) {
+        setEmailTestStatus('success');
+        setEmailTestMessage(result.message || 'Connected successfully!');
+      } else {
+        setEmailTestStatus('error');
+        setEmailTestMessage(result?.message || 'Connection failed.');
+      }
+      havenai.removeAllListeners?.('email-config-result');
+    });
   };
 
   return (
@@ -353,6 +421,122 @@ export function SetupPanel({
           </div>
         )}
       </div>
+
+      {isDesktopRuntime && (
+        <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02]">
+          <button
+            type="button"
+            onClick={() => setEmailMonitorOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-xs text-gray-400"
+          >
+            <span>
+              Email Inbox Monitoring
+              <span className="ml-2 text-[11px] text-gray-600">
+                {emailTestStatus === 'success' ? 'Connected' : 'Not configured'}
+              </span>
+            </span>
+            {emailMonitorOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
+          {emailMonitorOpen && (
+            <div className="space-y-3 border-t border-white/[0.06] px-3 pb-3 pt-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-400">Email address</label>
+                <input
+                  type="email"
+                  value={emailAddress}
+                  onChange={(e) => setEmailAddress(e.target.value)}
+                  placeholder="you@gmail.com"
+                  className="glass-input !text-xs !py-2"
+                />
+              </div>
+
+              {detectedProvider ? (
+                <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/[0.04] p-2.5 text-xs">
+                  <p className="font-medium text-cyan-300">
+                    {detectedProvider.name} account detected
+                  </p>
+                  <p className="mt-1 text-gray-400">
+                    IMAP: {detectedProvider.imapHost}:{detectedProvider.imapPort}
+                  </p>
+                  <p className="mt-2 text-gray-400">
+                    Generate an app password from your provider:
+                  </p>
+                  <a
+                    href={detectedProvider.instructionsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-block text-cyan-400 underline hover:text-cyan-300"
+                  >
+                    Open {detectedProvider.name} app password settings
+                  </a>
+                </div>
+              ) : emailAddress.includes('@') ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500">Unknown provider — enter IMAP details manually.</p>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="mb-1 block text-xs text-gray-400">IMAP Host</label>
+                      <input
+                        type="text"
+                        value={manualImapHost}
+                        onChange={(e) => setManualImapHost(e.target.value)}
+                        placeholder="imap.example.com"
+                        className="glass-input !text-xs !py-2"
+                      />
+                    </div>
+                    <div className="w-20">
+                      <label className="mb-1 block text-xs text-gray-400">Port</label>
+                      <input
+                        type="text"
+                        value={manualImapPort}
+                        onChange={(e) => setManualImapPort(e.target.value)}
+                        placeholder="993"
+                        className="glass-input !text-xs !py-2"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div>
+                <label className="mb-1 block text-xs text-gray-400">App password</label>
+                <input
+                  type="password"
+                  value={appPassword}
+                  onChange={(e) => setAppPassword(e.target.value)}
+                  placeholder="Paste your app-specific password"
+                  className="glass-input !text-xs !py-2"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleEmailTest}
+                disabled={emailTestStatus === 'testing' || !emailAddress || !appPassword}
+                className={`w-full rounded-lg px-3 py-2 text-xs font-medium transition ${
+                  emailTestStatus === 'testing'
+                    ? 'cursor-wait bg-white/[0.06] text-gray-400'
+                    : emailTestStatus === 'success'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {emailTestStatus === 'testing'
+                  ? 'Testing connection...'
+                  : emailTestStatus === 'success'
+                  ? 'Connected'
+                  : 'Test Connection'}
+              </button>
+
+              {emailTestMessage && (
+                <p className={`text-xs ${emailTestStatus === 'success' ? 'text-emerald-400' : emailTestStatus === 'error' ? 'text-red-400' : 'text-gray-400'}`}>
+                  {emailTestMessage}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02]">
         <button

@@ -397,6 +397,20 @@ function initPythonBridge(): void {
       }
     });
     emitMonitorControlState();
+
+    // Restore email monitor credentials if saved
+    const savedEmail = store.get('emailMonitor') as any;
+    if (savedEmail?.email && savedEmail?.password) {
+      pythonBridge?.send({
+        type: 'configure_email',
+        data: {
+          host: savedEmail.imapHost,
+          port: savedEmail.imapPort,
+          user: savedEmail.email,
+          password: Buffer.from(savedEmail.password, 'base64').toString('utf-8'),
+        },
+      });
+    }
   });
 
   pythonBridge.on('alert', (alert: any) => {
@@ -464,6 +478,22 @@ function initPythonBridge(): void {
       store.set('deviceId', data.device_id);
     }
     mainWindow?.webContents.send('agent-auth', { status: 'synced', ...data });
+  });
+
+  pythonBridge.on('email-config-result', (data: any) => {
+    mainWindow?.webContents.send('email-config-result', data);
+  });
+
+  pythonBridge.on('local-events', (data: any) => {
+    mainWindow?.webContents.send('local-events', data);
+  });
+
+  pythonBridge.on('local-alerts', (data: any) => {
+    mainWindow?.webContents.send('local-alerts', data);
+  });
+
+  pythonBridge.on('local-stats', (data: any) => {
+    mainWindow?.webContents.send('local-stats', data);
   });
 
   pythonBridge.on('preferences-applied', (data: any) => {
@@ -636,6 +666,43 @@ ipcMain.handle('grant-monitor-permission', (_, module: MonitorModule) => {
 ipcMain.handle('agent-logout', () => {
   pythonBridge?.send({ type: 'logout' });
   store.delete('deviceId');
+  return true;
+});
+
+ipcMain.handle('configure-email-monitor', (_, payload) => {
+  if (payload?.email && payload?.password) {
+    store.set('emailMonitor', {
+      email: payload.email,
+      imapHost: payload.imapHost,
+      imapPort: payload.imapPort,
+      password: Buffer.from(payload.password).toString('base64'),
+    });
+  }
+
+  pythonBridge?.send({
+    type: 'configure_email',
+    data: {
+      host: payload?.imapHost,
+      port: payload?.imapPort,
+      user: payload?.email,
+      password: payload?.password,
+    },
+  });
+  return true;
+});
+
+ipcMain.handle('query-local-events', (_, params) => {
+  pythonBridge?.send({ type: 'query_events', data: params || {} });
+  return true;
+});
+
+ipcMain.handle('query-local-alerts', (_, params) => {
+  pythonBridge?.send({ type: 'query_alerts', data: params || {} });
+  return true;
+});
+
+ipcMain.handle('get-local-stats', () => {
+  pythonBridge?.send({ type: 'get_local_stats' });
   return true;
 });
 

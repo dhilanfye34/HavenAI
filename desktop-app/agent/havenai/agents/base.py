@@ -35,7 +35,8 @@ class Agent(ABC):
         self, 
         shared_context: Dict[str, Any], 
         alert_queue: Queue,
-        name: Optional[str] = None
+        name: Optional[str] = None,
+        local_db=None
     ):
         """
         Initialize the agent.
@@ -44,10 +45,12 @@ class Agent(ABC):
             shared_context: Dictionary shared between all agents for communication
             alert_queue: Queue to send alerts to the coordinator
             name: Optional name for the agent (defaults to class name)
+            local_db: Optional LocalDB instance for persisting events locally
         """
         self.shared_context = shared_context
         self.alert_queue = alert_queue
         self.name = name or self.__class__.__name__
+        self.local_db = local_db
         
         self.running = False
         self._thread: Optional[Thread] = None
@@ -188,6 +191,15 @@ class Agent(ABC):
         self.alert_queue.put(alert)
         logger.info(f"{self.name} sent alert: {alert['type']}")
     
+    def store_event(self, kind: str, data: dict) -> None:
+        """Persist an event to the local SQLite DB if available."""
+        if self.local_db is None:
+            return
+        try:
+            self.local_db.insert_event(kind, data)
+        except Exception as e:
+            logger.error(f"{self.name} failed to store event: {e}")
+
     def get_baseline(self, key: str, default: Any = None) -> Any:
         """
         Get a value from the shared baseline.

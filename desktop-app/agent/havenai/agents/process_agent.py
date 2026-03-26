@@ -50,8 +50,8 @@ class ProcessAgent(Agent):
     - Processes with unusual behavior
     """
     
-    def __init__(self, shared_context: Dict[str, Any], alert_queue: Queue):
-        super().__init__(shared_context, alert_queue, name="ProcessAgent")
+    def __init__(self, shared_context: Dict[str, Any], alert_queue: Queue, local_db=None):
+        super().__init__(shared_context, alert_queue, name="ProcessAgent", local_db=local_db)
         
         # Track known processes to detect new ones
         self.known_pids: Set[int] = set()
@@ -207,6 +207,9 @@ class ProcessAgent(Agent):
                     "recommendation": finding["recommendation"]
                 }
             })
+
+        for event_data in self.shared_context.get(self.name, {}).get("recent_process_events", []):
+            self.store_event("process", event_data)
     
     def _analyze_process(self, proc: Dict[str, Any]) -> tuple[float, List[str]]:
         """

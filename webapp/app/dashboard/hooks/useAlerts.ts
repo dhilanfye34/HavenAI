@@ -31,15 +31,32 @@ export function useAlerts() {
   useEffect(() => {
     const havenai = (window as any).havenai;
     if (havenai?.onNewAlert) {
-      // Desktop runtime mode: consume real alerts from Python bridge.
       setAlerts([]);
+
       havenai.onNewAlert((rawAlert: any) => {
         const next = toSecurityAlert(rawAlert);
-        setAlerts((current) => [next, ...current].slice(0, 50));
+        setAlerts((current) => [next, ...current].slice(0, 100));
         setLatestAlertId(next.id);
       });
+
+      if (havenai.queryLocalAlerts && havenai.onLocalAlerts) {
+        havenai.onLocalAlerts((data: any) => {
+          if (Array.isArray(data)) {
+            const historical = data.map(toSecurityAlert);
+            setAlerts((current) => {
+              const existingIds = new Set(current.map((a) => a.id));
+              const unique = historical.filter((a) => !existingIds.has(a.id));
+              return [...current, ...unique].slice(0, 100);
+            });
+          }
+        });
+        const sevenDaysAgo = Date.now() / 1000 - 7 * 86400;
+        havenai.queryLocalAlerts({ since: sevenDaysAgo, limit: 50 });
+      }
+
       return () => {
         havenai.removeAllListeners?.('new-alert');
+        havenai.removeAllListeners?.('local-alerts');
       };
     }
 

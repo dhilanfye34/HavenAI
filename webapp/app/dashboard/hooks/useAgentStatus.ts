@@ -27,6 +27,7 @@ function titleFromKey(key: string): string {
 export function useAgentStatus() {
   const [agents, setAgents] = useState<AgentStatus[]>(initialAgentStatuses);
   const [runtimeStatus, setRuntimeStatus] = useState<AgentRuntimeStatus | null>(null);
+  const [localStats, setLocalStats] = useState<any>(null);
 
   const mapRuntimeMetrics = (metrics: any): RuntimeMetrics | null => {
     if (!metrics || typeof metrics !== 'object') return null;
@@ -115,8 +116,17 @@ export function useAgentStatus() {
 
       havenai.onAgentStatus(applyStatus);
       havenai.sendToAgent?.({ type: 'get_status' });
+
+      if (havenai.getLocalStats && havenai.onLocalStats) {
+        havenai.onLocalStats((data: any) => {
+          setLocalStats(data);
+        });
+        havenai.getLocalStats();
+      }
+
       return () => {
         havenai.removeAllListeners?.('agent-status');
+        havenai.removeAllListeners?.('local-stats');
       };
     }
 
@@ -127,5 +137,5 @@ export function useAgentStatus() {
     return () => clearInterval(interval);
   }, []);
 
-  return { agents, runtimeStatus };
+  return { agents, runtimeStatus, localStats };
 }

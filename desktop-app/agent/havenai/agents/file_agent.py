@@ -90,9 +90,10 @@ class FileAgent(Agent):
         self, 
         shared_context: Dict[str, Any], 
         alert_queue: Queue,
-        watch_paths: Optional[List[str]] = None
+        watch_paths: Optional[List[str]] = None,
+        local_db=None
     ):
-        super().__init__(shared_context, alert_queue, name="FileAgent")
+        super().__init__(shared_context, alert_queue, name="FileAgent", local_db=local_db)
         
         # Determine paths to watch
         if watch_paths:
@@ -226,6 +227,9 @@ class FileAgent(Agent):
                     "recommendation": finding["recommendation"]
                 }
             })
+
+        for event_data in self.shared_context.get(self.name, {}).get("recent_events", []):
+            self.store_event("file", event_data)
     
     def _analyze_new_file(self, event: Dict[str, Any]) -> tuple[float, List[str]]:
         """
