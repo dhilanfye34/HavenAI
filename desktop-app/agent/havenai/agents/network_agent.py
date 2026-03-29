@@ -222,7 +222,19 @@ class NetworkAgent(Agent):
         
         return {
             "findings": findings,
-            "new_connection_count": len(observation["new_connections"])
+            "new_connection_count": len(observation["new_connections"]),
+            "_current_new_connections": [
+                {
+                    "process_name": c.get("process_name"),
+                    "pid": c.get("pid"),
+                    "remote_ip": c.get("remote_ip"),
+                    "remote_port": c.get("remote_port"),
+                    "hostname": c.get("hostname"),
+                    "status": c.get("status"),
+                    "timestamp": observation.get("timestamp"),
+                }
+                for c in observation["new_connections"]
+            ],
         }
     
     def act(self, analysis: Dict[str, Any]) -> None:
@@ -260,7 +272,8 @@ class NetworkAgent(Agent):
                 }
             })
 
-        for event_data in self.shared_context.get(self.name, {}).get("recent_network_events", []):
+        # Store only this cycle's new connections (not the accumulated list)
+        for event_data in analysis.get("_current_new_connections", []):
             self.store_event("network", event_data)
     
     def _analyze_connection(self, conn: Dict[str, Any]) -> tuple[float, List[str]]:
@@ -325,30 +338,37 @@ class NetworkAgent(Agent):
         return risk, reasons
     
     def _reverse_dns(self, ip: str) -> Optional[str]:
-        """Attempt reverse DNS lookup with caching."""
+        """Attempt reverse DNS lookup with caching and a short timeout."""
         if ip in self.dns_cache:
             return self.dns_cache[ip]
-        
+
+        # Use a timeout to prevent blocking the perceive cycle.
+        old_timeout = socket.getdefaulttimeout()
         try:
+            socket.setdefaulttimeout(1.5)
             hostname = socket.gethostbyaddr(ip)[0]
             self.dns_cache[ip] = hostname
             return hostname
-        except (socket.herror, socket.gaierror, socket.timeout):
+        except (socket.herror, socket.gaierror, socket.timeout, OSError):
             self.dns_cache[ip] = None
             return None
+        finally:
+            socket.setdefaulttimeout(old_timeout)
 
     def _netstat_fallback_snapshot(self) -> List[Dict[str, Any]]:
         """
         Build active TCP connection snapshot without PID attribution.
 
-        Used when psutil cannot enumerate remote sockets due platform constraints.
+        Used when psutil cannot enumerate remote sockets due to platform constraints.
+        macOS netstat formats IPv4 as ``ip.port`` (e.g. ``192.168.1.5.443``)
+        and IPv6 as ``addr.port`` (e.g. ``::1.443`` or ``fe80::1%lo0.443``).
         """
         try:
             result = subprocess.run(
                 ["netstat", "-an", "-p", "tcp"],
                 capture_output=True,
                 text=True,
-                timeout=2.0,
+                timeout=3.0,
                 check=False,
             )
             if result.returncode != 0:
@@ -366,31 +386,27 @@ class NetworkAgent(Agent):
             if len(parts) < 6:
                 continue
 
-            local_addr = parts[3]
             remote_addr = parts[4]
             state = parts[5]
-            if remote_addr.startswith("127.") or remote_addr.startswith("::1"):
-                continue
             if state not in {"ESTABLISHED", "SYN_SENT", "SYN_RECEIVED"}:
                 continue
-            if "." not in remote_addr:
+
+            remote_ip, remote_port = self._parse_netstat_addr(remote_addr)
+            if remote_ip is None or remote_port is None:
                 continue
 
-            remote_ip, remote_port = remote_addr.rsplit(".", 1)
-            if not remote_port.isdigit():
+            # Skip loopback
+            if remote_ip in ("127.0.0.1", "::1") or remote_ip.startswith("127."):
                 continue
 
-            local_port = None
-            if "." in local_addr:
-                maybe_local_port = local_addr.rsplit(".", 1)[-1]
-                if maybe_local_port.isdigit():
-                    local_port = int(maybe_local_port)
+            local_addr = parts[3]
+            _, local_port = self._parse_netstat_addr(local_addr)
 
             snapshot.append(
                 {
                     "local_port": local_port,
                     "remote_ip": remote_ip,
-                    "remote_port": int(remote_port),
+                    "remote_port": remote_port,
                     "status": state,
                     "pid": None,
                     "process_name": "unknown",
@@ -399,6 +415,37 @@ class NetworkAgent(Agent):
             )
 
         return snapshot[:150]
+
+    @staticmethod
+    def _parse_netstat_addr(addr: str) -> tuple:
+        """
+        Parse a macOS netstat address string into (ip, port).
+
+        macOS formats:
+          IPv4: ``10.0.0.1.443`` → (``10.0.0.1``, 443)
+          IPv6: ``::1.993`` or ``fe80::1%lo0.443`` → (``::1``, 993)
+          Wildcard: ``*.443`` → (None, 443)
+        """
+        if not addr or addr == "*.*":
+            return (None, None)
+
+        # Handle wildcard addresses like "*.443"
+        if addr.startswith("*."):
+            port_str = addr[2:]
+            return (None, int(port_str)) if port_str.isdigit() else (None, None)
+
+        # The port is always the last dot-separated component on macOS netstat.
+        last_dot = addr.rfind(".")
+        if last_dot == -1:
+            return (None, None)
+
+        port_str = addr[last_dot + 1:]
+        ip_part = addr[:last_dot]
+
+        if not port_str.isdigit():
+            return (None, None)
+
+        return (ip_part, int(port_str))
     
     def _get_recommendation(self, risk_score: float, conn: Dict[str, Any]) -> str:
         """Generate a recommendation based on the connection analysis."""

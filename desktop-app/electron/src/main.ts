@@ -12,6 +12,7 @@ import { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, she
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { execSync } from 'child_process';
 import { PythonBridge } from './python-bridge';
 import Store from 'electron-store';
 
@@ -34,28 +35,11 @@ type MonitorLifecycleState = 'off' | 'pending_permission' | 'running' | 'blocked
 type MonitorDesired = Record<MonitorModule, boolean>;
 type MonitorStateMap = Record<MonitorModule, MonitorLifecycleState>;
 type MonitorBlockers = Record<MonitorModule, string[]>;
-type MonitorPermissionGrants = Record<MonitorModule, boolean>;
-
 const MONITOR_MODULES: MonitorModule[] = ['file', 'process', 'network'];
-const DEFAULT_MONITOR_DESIRED: MonitorDesired = {
-  file: false,
-  process: false,
-  network: false,
-};
 const DEFAULT_MONITOR_STATE: MonitorStateMap = {
   file: 'off',
   process: 'off',
   network: 'off',
-};
-const DEFAULT_MONITOR_BLOCKERS: MonitorBlockers = {
-  file: [],
-  process: [],
-  network: [],
-};
-const DEFAULT_MONITOR_PERMISSION_GRANTS: MonitorPermissionGrants = {
-  file: false,
-  process: false,
-  network: false,
 };
 
 function readMonitorDesired(): MonitorDesired {
@@ -85,27 +69,14 @@ function readMonitorBlockers(): MonitorBlockers {
   };
 }
 
-function readMonitorPermissionGrants(): MonitorPermissionGrants {
-  const raw = (store.get('monitorPermissionGrants') || {}) as Partial<MonitorPermissionGrants>;
-  return {
-    file: Boolean(raw.file),
-    process: Boolean(raw.process),
-    network: Boolean(raw.network),
-  };
-}
-
 function writeMonitorState(
   desired: MonitorDesired,
   state: MonitorStateMap,
   blockers: MonitorBlockers,
-  grants?: MonitorPermissionGrants,
 ) {
   store.set('monitorDesired', desired);
   store.set('monitorState', state);
   store.set('monitorBlockers', blockers);
-  if (grants) {
-    store.set('monitorPermissionGrants', grants);
-  }
 }
 
 function moduleToPreferencePatch(module: MonitorModule, enabled: boolean) {
@@ -119,7 +90,6 @@ function buildMonitorControlState() {
     desired: readMonitorDesired(),
     state: readMonitorStateMap(),
     blockers: readMonitorBlockers(),
-    grants: readMonitorPermissionGrants(),
     updated_at: new Date().toISOString(),
   };
 }
@@ -128,50 +98,65 @@ function emitMonitorControlState() {
   mainWindow?.webContents.send('monitor-state', buildMonitorControlState());
 }
 
-function checkMonitorPermissions(module: MonitorModule): { allowed: boolean; blockers: string[] } {
+function checkMonitorPermissions(module: MonitorModule): { allowed: boolean; blockers: string[]; degraded?: boolean; degradedReason?: string } {
   const blockers: string[] = [];
-  const grants = readMonitorPermissionGrants();
+  let degraded = false;
+  let degradedReason: string | undefined;
 
-  if (!grants[module]) {
-    blockers.push('Access not granted yet. Use "Allow access and retry" to continue.');
-    return { allowed: false, blockers };
-  }
-
-  // File monitoring requires readable Desktop/Downloads paths.
   if (module === 'file') {
+    // File monitoring requires readable Desktop/Downloads paths.
     const targets = [path.join(os.homedir(), 'Desktop'), path.join(os.homedir(), 'Downloads')];
     for (const target of targets) {
       try {
         fs.accessSync(target, fs.constants.R_OK);
       } catch {
-        blockers.push(`Cannot read ${target}. Grant Files and Folders / Full Disk Access.`);
+        blockers.push(`Cannot read ${target}. Grant Files and Folders or Full Disk Access in System Settings > Privacy & Security.`);
       }
     }
   }
 
-  // Process and network monitoring generally do not need a single explicit TCC gate.
-  if (module === 'process' && process.platform === 'darwin') {
-    blockers.push(...[]);
-  }
-  if (module === 'network' && process.platform === 'darwin') {
-    blockers.push(...[]);
+  if (module === 'process') {
+    // Process listing via psutil/sysctl works without special permissions on macOS.
+    // Smoke-test that basic process enumeration is functional.
+    if (process.platform === 'darwin') {
+      try {
+        execSync('ps -e -o pid=', { stdio: 'ignore', timeout: 3000 });
+      } catch {
+        blockers.push('Cannot list processes. Check that the app has not been restricted by parental controls or MDM.');
+      }
+    }
   }
 
-  return { allowed: blockers.length === 0, blockers };
+  if (module === 'network') {
+    // Network connection listing works via netstat without root on macOS,
+    // but per-process socket attribution requires root/elevated privileges.
+    // We allow it to start but flag the degraded state.
+    if (process.platform === 'darwin') {
+      try {
+        execSync('netstat -an -p tcp', { stdio: 'ignore', timeout: 3000 });
+      } catch {
+        blockers.push('Cannot read network connections.');
+      }
+      // Even when netstat works, psutil cannot attribute connections to processes without root.
+      degraded = true;
+      degradedReason = 'Network monitoring runs in limited mode: connections are visible but process attribution is unavailable without elevated privileges.';
+    }
+  }
+
+  return { allowed: blockers.length === 0, blockers, degraded, degradedReason };
 }
 
 async function setMonitorDesired(module: MonitorModule, enabled: boolean) {
   const desired = readMonitorDesired();
   const state = readMonitorStateMap();
   const blockers = readMonitorBlockers();
-  const grants = readMonitorPermissionGrants();
 
   desired[module] = enabled;
 
   if (!enabled) {
     state[module] = 'off';
     blockers[module] = [];
-    writeMonitorState(desired, state, blockers, grants);
+    writeMonitorState(desired, state, blockers);
     pythonBridge?.send({ type: 'update_preferences', data: moduleToPreferencePatch(module, false) });
     emitMonitorControlState();
     return buildMonitorControlState();
@@ -179,21 +164,26 @@ async function setMonitorDesired(module: MonitorModule, enabled: boolean) {
 
   state[module] = 'pending_permission';
   blockers[module] = [];
-  writeMonitorState(desired, state, blockers, grants);
+  writeMonitorState(desired, state, blockers);
   emitMonitorControlState();
 
+  // Run real capability checks — no self-referential grants gate.
   const permissionResult = checkMonitorPermissions(module);
   if (!permissionResult.allowed) {
     state[module] = 'blocked';
     blockers[module] = permissionResult.blockers;
-    writeMonitorState(desired, state, blockers, grants);
+    writeMonitorState(desired, state, blockers);
     emitMonitorControlState();
     return buildMonitorControlState();
   }
 
   state[module] = 'running';
   blockers[module] = [];
-  writeMonitorState(desired, state, blockers, grants);
+  // If degraded, include the reason in blockers so the UI can display it.
+  if (permissionResult.degraded && permissionResult.degradedReason) {
+    blockers[module] = [permissionResult.degradedReason];
+  }
+  writeMonitorState(desired, state, blockers);
   pythonBridge?.send({ type: 'update_preferences', data: moduleToPreferencePatch(module, true) });
   emitMonitorControlState();
   return buildMonitorControlState();
@@ -645,22 +635,13 @@ ipcMain.handle('set-monitor-desired', (_, payload: { module: MonitorModule; enab
   return setMonitorDesired(payload.module, Boolean(payload.enabled));
 });
 
-ipcMain.handle('grant-monitor-permission', (_, module: MonitorModule) => {
+ipcMain.handle('grant-monitor-permission', async (_, module: MonitorModule) => {
   if (!module || !MONITOR_MODULES.includes(module)) {
     return buildMonitorControlState();
   }
-  const desired = readMonitorDesired();
-  const state = readMonitorStateMap();
-  const blockers = readMonitorBlockers();
-  const grants = readMonitorPermissionGrants();
-  grants[module] = true;
-  if (state[module] === 'blocked') {
-    state[module] = 'pending_permission';
-    blockers[module] = [];
-  }
-  writeMonitorState(desired, state, blockers, grants);
-  emitMonitorControlState();
-  return buildMonitorControlState();
+  // Re-run the real permission check and attempt to start the monitor.
+  // The user should have granted access in System Settings before clicking retry.
+  return setMonitorDesired(module, true);
 });
 
 ipcMain.handle('agent-logout', () => {
@@ -710,24 +691,24 @@ ipcMain.handle('open-permissions-settings', async (_, target?: 'file' | 'process
   if (process.platform === 'darwin') {
     const targetToUrls: Record<string, string[]> = {
       file: [
+        // Full Disk Access is the most reliable way to ensure file monitoring works.
         'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
-        'x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders',
       ],
       process: [
-        'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
+        // Process monitoring works without special permissions on macOS.
+        // Open the general Privacy & Security pane as a reference.
+        'x-apple.systempreferences:com.apple.preference.security?Privacy',
       ],
       network: [
-        'x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork',
+        // Network monitoring limitations are Unix privilege-based, not TCC.
+        // Full Disk Access can help with broader socket visibility.
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
       ],
       alerts: [
         'x-apple.systempreferences:com.apple.preference.notifications',
       ],
       all: [
         'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
-        'x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders',
-        'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
-        'x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork',
-        'x-apple.systempreferences:com.apple.preference.notifications',
       ],
     };
     const urls = targetToUrls[target || 'all'] || targetToUrls.all;
@@ -741,13 +722,17 @@ ipcMain.handle('open-permissions-settings', async (_, target?: 'file' | 'process
     return true;
   }
 
-  // Non-macOS fallback.
-  try {
-    await shell.openExternal('https://support.apple.com/guide/mac-help/control-access-to-files-and-folders-on-mac-mchld5a35146/mac');
-    return true;
-  } catch {
-    return false;
+  // Non-macOS fallback — open system settings.
+  if (process.platform === 'win32') {
+    try {
+      await shell.openExternal('ms-settings:privacy');
+      return true;
+    } catch {
+      return false;
+    }
   }
+
+  return false;
 });
 
 // ============== App Lifecycle ==============
@@ -782,7 +767,7 @@ app.on('before-quit', () => {
 
 // Handle certificate errors in development
 if (isDev) {
-  app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+  app.on('certificate-error', (event, _webContents, _url, _error, _certificate, callback) => {
     event.preventDefault();
     callback(true);
   });

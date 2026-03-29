@@ -21,18 +21,49 @@ from .base import Agent
 logger = logging.getLogger(__name__)
 
 
-# Processes that are known to be commonly abused
-SUSPICIOUS_PROCESS_NAMES = {
-    'powershell', 'cmd', 'wscript', 'cscript', 'mshta',
-    'regsvr32', 'rundll32', 'certutil', 'bitsadmin'
-}
+import sys
 
-# Normal system processes (shouldn't alert on these spawning)
-SYSTEM_PROCESSES = {
-    'system', 'registry', 'smss', 'csrss', 'wininit',
-    'services', 'lsass', 'svchost', 'explorer', 'dwm',
-    'kernel_task', 'launchd', 'WindowServer'  # macOS
-}
+# Processes that are known to be commonly abused — platform-aware.
+if sys.platform == 'darwin':
+    SUSPICIOUS_PROCESS_NAMES = {
+        'osascript',       # AppleScript runner — used for social engineering dialogs
+        'curl', 'wget',    # Command-line downloaders
+        'nc', 'ncat',      # Netcat — reverse shells
+        'openssl',         # Can be used for encrypted C2 tunnels
+        'screencapture',   # Screenshot capture
+        'security',        # Keychain access tool
+        'scp', 'sftp',     # File exfiltration
+        'base64',          # Encoding payloads
+        'pbcopy',          # Clipboard exfiltration
+        'launchctl',       # Persistence via launch agents
+        'crontab',         # Persistence via cron
+        'dscl',            # Directory service — user/group manipulation
+    }
+    SYSTEM_PROCESSES = {
+        'kernel_task', 'launchd', 'WindowServer', 'loginwindow',
+        'systemstats', 'syslogd', 'configd', 'opendirectoryd',
+        'mds', 'mds_stores', 'mdworker', 'mdworker_shared',
+        'fseventsd', 'coreaudiod', 'coreservicesd',
+        'trustd', 'securityd', 'diskarbitrationd',
+        'bluetoothd', 'airportd', 'wifid',
+        'symptomsd', 'timed', 'powerd', 'thermalmonitord',
+        'notifyd', 'usbd', 'ioupsd', 'distnoted',
+        'UserEventAgent', 'cfprefsd', 'containermanagerd',
+        'logd', 'watchdogd', 'routined', 'dasd',
+        'rapportd', 'sharingd', 'cloudd',
+        'Finder', 'Dock', 'SystemUIServer', 'Spotlight',
+        'corespotlightd', 'lsd', 'iconservicesagent',
+    }
+else:
+    # Windows / fallback
+    SUSPICIOUS_PROCESS_NAMES = {
+        'powershell', 'cmd', 'wscript', 'cscript', 'mshta',
+        'regsvr32', 'rundll32', 'certutil', 'bitsadmin'
+    }
+    SYSTEM_PROCESSES = {
+        'system', 'registry', 'smss', 'csrss', 'wininit',
+        'services', 'lsass', 'svchost', 'explorer', 'dwm',
+    }
 
 
 class ProcessAgent(Agent):
@@ -173,7 +204,17 @@ class ProcessAgent(Agent):
         
         return {
             "findings": findings,
-            "new_process_count": len(observation["new_processes"])
+            "new_process_count": len(observation["new_processes"]),
+            "_current_new_processes": [
+                {
+                    "pid": p.get("pid"),
+                    "name": p.get("name"),
+                    "parent_name": p.get("parent_name"),
+                    "ppid": p.get("ppid"),
+                    "create_time": p.get("create_time"),
+                }
+                for p in observation["new_processes"]
+            ],
         }
     
     def act(self, analysis: Dict[str, Any]) -> None:
@@ -208,42 +249,61 @@ class ProcessAgent(Agent):
                 }
             })
 
-        for event_data in self.shared_context.get(self.name, {}).get("recent_process_events", []):
+        # Store only this cycle's new processes (not the accumulated list)
+        for event_data in analysis.get("_current_new_processes", []):
             self.store_event("process", event_data)
     
     def _analyze_process(self, proc: Dict[str, Any]) -> tuple[float, List[str]]:
         """
         Analyze a process for suspicious indicators.
-        
+
         Returns:
             (risk_score, reasons) tuple
         """
         risk = 0.0
         reasons = []
-        
+
         name = proc["name"].lower() if proc["name"] else ""
         parent_name = proc.get("parent_name", "").lower()
-        
+
+        # Skip known system processes entirely.
+        if name in {s.lower() for s in SYSTEM_PROCESSES}:
+            return 0.0, []
+
         # Check 1: Is this a commonly abused process?
         if name in SUSPICIOUS_PROCESS_NAMES:
             risk += 0.3
             reasons.append(f"'{name}' is commonly used in attacks")
-        
+
         # Check 2: Suspicious parent-child relationship
-        # e.g., Word/Excel spawning cmd/powershell is suspicious
-        office_apps = {'winword', 'excel', 'powerpnt', 'outlook', 'word', 'microsoft word'}
-        shell_processes = {'cmd', 'powershell', 'bash', 'sh', 'wscript', 'cscript'}
-        
+        # Office apps spawning shell/script interpreters is a classic attack vector.
+        if sys.platform == 'darwin':
+            office_apps = {
+                'microsoft word', 'microsoft excel', 'microsoft powerpoint',
+                'microsoft outlook', 'pages', 'numbers', 'keynote',
+            }
+            shell_processes = {
+                'bash', 'sh', 'zsh', 'osascript', 'python', 'python3',
+                'ruby', 'perl', 'curl', 'wget', 'nc',
+            }
+        else:
+            office_apps = {'winword', 'excel', 'powerpnt', 'outlook'}
+            shell_processes = {'cmd', 'powershell', 'bash', 'sh', 'wscript', 'cscript'}
+
         if parent_name in office_apps and name in shell_processes:
             risk += 0.5
             reasons.append(f"Office app ({parent_name}) spawned shell ({name})")
-        
+
         # Check 3: Browser spawning suspicious process
-        browsers = {'chrome', 'firefox', 'msedge', 'safari', 'opera'}
+        if sys.platform == 'darwin':
+            browsers = {'google chrome', 'firefox', 'safari', 'microsoft edge', 'opera', 'arc', 'brave browser'}
+        else:
+            browsers = {'chrome', 'firefox', 'msedge', 'safari', 'opera'}
+
         if parent_name in browsers and name in shell_processes:
             risk += 0.4
             reasons.append(f"Browser ({parent_name}) spawned shell ({name})")
-        
+
         # Check 4: Is this process in user's baseline?
         baseline_processes = self.get_baseline("process_names", [])
         if baseline_processes and name and name not in baseline_processes:
@@ -251,17 +311,20 @@ class ProcessAgent(Agent):
             if len(baseline_processes) > 10:  # Need enough baseline data
                 risk += 0.2
                 reasons.append(f"Process '{name}' not in your normal activity")
-        
+
         # Check 5: Process name obfuscation (random-looking names)
-        if name and len(name) > 8:
-            consonants = sum(1 for c in name if c.lower() in 'bcdfghjklmnpqrstvwxyz')
-            if consonants / len(name) > 0.7:
-                risk += 0.2
-                reasons.append("Process name appears randomly generated")
-        
+        # Be more conservative — skip short names and names with common macOS suffixes.
+        if name and len(name) > 12 and not name.endswith('d') and not name.endswith('agent'):
+            alpha_chars = [c for c in name if c.isalpha()]
+            if alpha_chars:
+                consonants = sum(1 for c in alpha_chars if c.lower() in 'bcdfghjklmnpqrstvwxyz')
+                if consonants / len(alpha_chars) > 0.8:
+                    risk += 0.2
+                    reasons.append("Process name appears randomly generated")
+
         # Cap risk at 1.0
         risk = min(risk, 1.0)
-        
+
         return risk, reasons
     
     def _get_recommendation(self, risk_score: float, proc: Dict[str, Any]) -> str:

@@ -397,11 +397,16 @@ export function SetupPanel({
           description="Monitors outbound/inbound network behavior and suspicious connections."
           checked={preferences.network_monitoring_enabled}
           status={networkState}
-          blockers={networkBlockers}
+          blockers={networkState === 'blocked' ? networkBlockers : []}
           locked={desktopLocked}
           disabled={saving}
           onToggle={(checked) => onSave({ network_monitoring_enabled: checked })}
         />
+        {networkState === 'running' && networkBlockers.length > 0 && (
+          <div className="rounded-lg border border-amber-500/10 bg-amber-500/[0.03] px-2.5 py-1.5 text-[11px] text-amber-300/80">
+            {networkBlockers[0]}
+          </div>
+        )}
         {networkState === 'blocked' && (
           <div className="flex gap-2">
             <button

@@ -24,45 +24,90 @@ from .base import Agent
 logger = logging.getLogger(__name__)
 
 
-# File extensions that are potentially dangerous
-SUSPICIOUS_EXTENSIONS = {
-    '.exe', '.msi', '.bat', '.cmd', '.ps1', '.vbs', '.js',
-    '.scr', '.pif', '.jar', '.app', '.dmg', '.pkg'
-}
+# File extensions that are potentially dangerous — platform-aware.
+import sys
+
+if sys.platform == 'darwin':
+    SUSPICIOUS_EXTENSIONS = {
+        # macOS native executables and installers
+        '.app', '.dmg', '.pkg', '.mpkg',
+        # macOS scripts
+        '.command', '.sh', '.workflow', '.action',
+        '.scpt', '.scptd', '.applescript',
+        # Cross-platform risks
+        '.jar', '.js', '.py', '.rb', '.pl',
+        # Windows executables (still suspicious if downloaded on Mac — may indicate phishing)
+        '.exe', '.msi', '.bat', '.cmd', '.ps1', '.vbs', '.scr', '.pif',
+    }
+else:
+    SUSPICIOUS_EXTENSIONS = {
+        '.exe', '.msi', '.bat', '.cmd', '.ps1', '.vbs', '.js',
+        '.scr', '.pif', '.jar', '.app', '.dmg', '.pkg',
+    }
 
 # File extensions that are commonly safe
 SAFE_EXTENSIONS = {
-    '.txt', '.pdf', '.doc', '.docx', '.xls', '.xlsx', 
+    '.txt', '.pdf', '.doc', '.docx', '.xls', '.xlsx',
     '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.gif',
     '.mp3', '.mp4', '.mov', '.zip'
+}
+
+# Filenames and patterns to ignore (macOS system noise)
+IGNORED_FILENAMES = {
+    '.DS_Store', '.localized', 'Icon\r',
+}
+
+# Filename prefixes to ignore (macOS resource forks, temp files)
+IGNORED_PREFIXES = ('._', '.com.apple.', '.Spotlight-')
+
+# Extensions for partial/in-progress downloads that should be ignored
+PARTIAL_DOWNLOAD_EXTENSIONS = {
+    '.crdownload',  # Chrome
+    '.part',        # Firefox
+    '.download',    # Safari
+    '.tmp',         # Various
+    '.partial',     # Various
 }
 
 
 class FileEventHandler(FileSystemEventHandler):
     """Handles file system events from watchdog."""
-    
+
     def __init__(self):
         self.events: List[Dict[str, Any]] = []
         self._lock = Lock()
-    
+
+    @staticmethod
+    def _should_ignore(filepath: str) -> bool:
+        """Return True if this file event is macOS system noise."""
+        filename = Path(filepath).name
+        if filename in IGNORED_FILENAMES:
+            return True
+        if any(filename.startswith(prefix) for prefix in IGNORED_PREFIXES):
+            return True
+        ext = Path(filepath).suffix.lower()
+        if ext in PARTIAL_DOWNLOAD_EXTENSIONS:
+            return True
+        return False
+
     def on_created(self, event: FileSystemEvent) -> None:
-        if not event.is_directory:
+        if not event.is_directory and not self._should_ignore(event.src_path):
             with self._lock:
                 self.events.append({
                     "type": "created",
                     "path": event.src_path,
                     "timestamp": time.time()
                 })
-    
+
     def on_modified(self, event: FileSystemEvent) -> None:
-        if not event.is_directory:
+        if not event.is_directory and not self._should_ignore(event.src_path):
             with self._lock:
                 self.events.append({
                     "type": "modified",
                     "path": event.src_path,
                     "timestamp": time.time()
                 })
-    
+
     def get_and_clear_events(self) -> List[Dict[str, Any]]:
         """Get all events and clear the list."""
         with self._lock:
@@ -193,14 +238,25 @@ class FileAgent(Agent):
         
         return {
             "findings": findings,
-            "event_count": len(observation["events"])
+            "event_count": len(observation["events"]),
+            "_current_events": [
+                {
+                    "type": e.get("type"),
+                    "path": e.get("path"),
+                    "filename": e.get("filename"),
+                    "extension": e.get("extension"),
+                    "size": e.get("size"),
+                    "timestamp": e.get("timestamp"),
+                }
+                for e in observation["events"]
+            ],
         }
     
     def act(self, analysis: Dict[str, Any]) -> None:
         """Send alerts for suspicious files."""
         for finding in analysis["findings"]:
             event = finding["event"]
-            
+
             # Determine severity based on risk score
             risk = finding["risk_score"]
             if risk >= 0.9:
@@ -211,7 +267,7 @@ class FileAgent(Agent):
                 severity = "medium"
             else:
                 severity = "low"
-            
+
             self.send_alert({
                 "type": "suspicious_download",
                 "severity": severity,
@@ -228,7 +284,8 @@ class FileAgent(Agent):
                 }
             })
 
-        for event_data in self.shared_context.get(self.name, {}).get("recent_events", []):
+        # Store only this cycle's events (not the accumulated recent_events list)
+        for event_data in analysis.get("_current_events", []):
             self.store_event("file", event_data)
     
     def _analyze_new_file(self, event: Dict[str, Any]) -> tuple[float, List[str]]:
