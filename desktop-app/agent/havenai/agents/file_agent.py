@@ -253,11 +253,14 @@ class FileAgent(Agent):
         }
     
     def act(self, analysis: Dict[str, Any]) -> None:
-        """Send alerts for suspicious files."""
+        """Send alerts for suspicious files and info-level new file events."""
+        # Track which events generated a high-severity alert so we don't double-alert.
+        alerted_paths: set = set()
+
         for finding in analysis["findings"]:
             event = finding["event"]
+            alerted_paths.add(event.get("path"))
 
-            # Determine severity based on risk score
             risk = finding["risk_score"]
             if risk >= 0.9:
                 severity = "critical"
@@ -283,6 +286,24 @@ class FileAgent(Agent):
                     "recommendation": finding["recommendation"]
                 }
             })
+
+        # Send low-severity info alerts for new non-suspicious files so they
+        # appear in the "all" and "info" feed filters.
+        for event_data in analysis.get("_current_events", []):
+            if event_data.get("type") == "created" and event_data.get("path") not in alerted_paths:
+                self.send_alert({
+                    "type": "new_file",
+                    "severity": "low",
+                    "title": f"New file: {event_data.get('filename', 'unknown')}",
+                    "description": f"File created in monitored directory.",
+                    "details": {
+                        "filename": event_data.get("filename"),
+                        "path": event_data.get("path"),
+                        "extension": event_data.get("extension", "unknown"),
+                        "size": event_data.get("size", 0),
+                        "risk_score": 0.0,
+                    }
+                })
 
         # Store only this cycle's events (not the accumulated recent_events list)
         for event_data in analysis.get("_current_events", []):

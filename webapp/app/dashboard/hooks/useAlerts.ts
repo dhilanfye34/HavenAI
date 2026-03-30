@@ -11,10 +11,13 @@ function mapSeverity(level?: string): SecurityAlert['severity'] {
 }
 
 function toSecurityAlert(alert: any): SecurityAlert {
+  // Use the DB id if present, otherwise fall back to timestamp + random suffix for uniqueness.
+  const ts = alert?.timestamp || alert?.created_at || Date.now() / 1000;
+  const id = alert?.id || `${ts}-${Math.random().toString(36).slice(2, 8)}`;
   return {
-    id: String(alert?.timestamp || Date.now()),
+    id: String(id),
     severity: mapSeverity(alert?.severity),
-    timestamp: new Date((alert?.timestamp || Date.now()) * 1000).toISOString(),
+    timestamp: new Date(ts * 1000).toISOString(),
     source: alert?.agent || alert?.type || 'Desktop Agent',
     description: alert?.title || alert?.description || 'Security event detected.',
     details:
@@ -46,7 +49,10 @@ export function useAlerts() {
             setAlerts((current) => {
               const existingIds = new Set(current.map((a) => a.id));
               const unique = historical.filter((a) => !existingIds.has(a.id));
-              return [...current, ...unique].slice(0, 100);
+              // Merge and sort newest-first so the feed is always chronological.
+              return [...current, ...unique]
+                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                .slice(0, 100);
             });
           }
         });

@@ -40,8 +40,13 @@ export function useChat() {
   }, [contextEvents]);
 
   const injectAlertContext = (alert: SecurityAlert) => {
-    setContextEvents((current) =>
-      [
+    setContextEvents((current) => {
+      // Deduplicate by checking if the same alert source+description already exists.
+      const key = `${alert.source}:${alert.description}`;
+      if (current.some((e) => `${e.source}:${e.description}`.startsWith(key.slice(0, 60)))) {
+        return current;
+      }
+      return [
         {
           source: alert.source,
           severity: alert.severity,
@@ -49,8 +54,8 @@ export function useChat() {
           description: `${alert.description} Details: ${alert.details}`,
         },
         ...current,
-      ].slice(0, 20),
-    );
+      ].slice(0, 20);
+    });
   };
 
   const injectRecommendationContext = (recommendation: Recommendation) => {
@@ -91,7 +96,7 @@ export function useChat() {
     });
 
     const now = Date.now();
-    const minIntervalMs = 12000;
+    const minIntervalMs = 60000; // Inject at most once per minute to avoid flooding.
     if (digest === lastRuntimeDigestRef.current) return;
     if (now - lastRuntimeInjectAtRef.current < minIntervalMs) return;
 
@@ -126,6 +131,15 @@ export function useChat() {
         ...current,
       ].slice(0, 30),
     );
+  };
+
+  const removeContextEvent = (index: number) => {
+    setContextEvents((current) => current.filter((_, i) => i !== index));
+  };
+
+  const clearContextEvents = () => {
+    setContextEvents([]);
+    lastRuntimeDigestRef.current = '';
   };
 
   const sendMessage = async (content: string) => {
@@ -216,6 +230,8 @@ export function useChat() {
     injectAlertContext,
     injectRecommendationContext,
     injectRuntimeContext,
+    removeContextEvent,
+    clearContextEvents,
     sendMessage,
   };
 }

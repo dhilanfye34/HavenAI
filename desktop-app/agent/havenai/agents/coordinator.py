@@ -70,6 +70,8 @@ class Coordinator:
         # Heartbeat tracking
         self._last_heartbeat = 0
         self._heartbeat_interval = 60  # seconds
+        self._consecutive_heartbeat_failures = 0
+        self._max_heartbeat_failures = 3  # stop trying after 3 consecutive failures
         self._last_preferences_sync = 0.0
         self._preferences_sync_interval = 20.0
 
@@ -207,7 +209,7 @@ class Coordinator:
                 except Exception as e:
                     logger.debug(f"Failed to enqueue alert for {agent.name}: {e}")
         
-        # Sync medium+ severity alerts to cloud backend
+        # Sync medium+ severity alerts to cloud backend (with PII scrubbed).
         if (
             self.sync_to_cloud
             and self.api_client
@@ -215,7 +217,7 @@ class Coordinator:
             and alert.get("severity", "low") in ("medium", "high", "critical")
         ):
             try:
-                self.api_client.send_alert(alert)
+                self.api_client.send_alert(self._scrub_alert_for_cloud(alert))
             except Exception as e:
                 logger.error(f"Failed to sync alert to cloud: {e}")
         
@@ -288,7 +290,11 @@ class Coordinator:
         """Send heartbeat to backend if enough time has passed."""
         if not self.sync_to_cloud or not self.api_client:
             return
-        
+
+        # Circuit breaker: stop hammering the backend with a dead token.
+        if self._consecutive_heartbeat_failures >= self._max_heartbeat_failures:
+            return
+
         now = time.time()
         if now - self._last_heartbeat >= self._heartbeat_interval:
             heartbeat_ok = False
@@ -301,7 +307,6 @@ class Coordinator:
                     if not heartbeat_ok and self.api_client.has_tokens() and not self.api_client.device_id:
                         heartbeat_ok = self._ensure_device_registered()
             elif self.api_client.has_tokens():
-                # We have auth tokens but no device id yet.
                 heartbeat_ok = self._ensure_device_registered()
 
             self._auth_status["last_heartbeat_ok"] = heartbeat_ok
@@ -309,8 +314,14 @@ class Coordinator:
             if heartbeat_ok:
                 self._auth_status["state"] = "connected"
                 self._auth_status["last_error"] = None
+                self._consecutive_heartbeat_failures = 0
             else:
-                if self.api_client.has_tokens():
+                self._consecutive_heartbeat_failures += 1
+                if self._consecutive_heartbeat_failures >= self._max_heartbeat_failures:
+                    self._auth_status["state"] = "auth_expired"
+                    self._auth_status["last_error"] = "Session expired. Please re-login."
+                    logger.warning("Heartbeat circuit breaker tripped after %d failures — stopping retries", self._consecutive_heartbeat_failures)
+                elif self.api_client.has_tokens():
                     self._auth_status["state"] = "degraded"
             self._last_heartbeat = now
             self._send_status()
@@ -358,7 +369,12 @@ class Coordinator:
             self._send_status()
 
     def _sync_monitor_agents(self) -> None:
-        """Start/stop monitor agents to match desired preferences."""
+        """Start/stop monitor agents to match desired preferences.
+
+        Agent stops are performed in a background thread so the stdin reader
+        thread (which processes Electron messages) is never blocked by a
+        ``thread.join`` that could take up to 5 s per agent.
+        """
         for pref_key, (agent_name, agent_cls) in self._monitor_config_map.items():
             should_enable = bool(self._desired_preferences.get(pref_key, True))
             is_running = agent_name in self.monitor_agents
@@ -370,7 +386,13 @@ class Coordinator:
                 logger.info(f"Enabled monitor module: {agent_name}")
             elif not should_enable and is_running:
                 agent = self.monitor_agents.pop(agent_name)
-                agent.stop()
+                # Stop in a background thread to avoid blocking the stdin reader.
+                def _stop_agent(a: "Agent", name: str) -> None:
+                    try:
+                        a.stop()
+                    except Exception as exc:
+                        logger.warning(f"Error stopping {name}: {exc}")
+                Thread(target=_stop_agent, args=(agent, agent_name), daemon=True).start()
                 logger.info(f"Disabled monitor module: {agent_name}")
 
     def _ensure_device_registered(self) -> bool:
@@ -600,6 +622,27 @@ class Coordinator:
             ],
         }
 
+    @staticmethod
+    def _scrub_path(value: str) -> str:
+        """Replace /Users/<username>/ with ~/…/ to avoid leaking local usernames."""
+        import re
+        return re.sub(r"/Users/[^/]+/", "~/…/", value)
+
+    def _scrub_alert_for_cloud(self, alert: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a copy of the alert with PII-sensitive paths scrubbed."""
+        import copy
+        scrubbed = copy.deepcopy(alert)
+        details = scrubbed.get("details")
+        if isinstance(details, dict):
+            for key in ("path", "filename", "file"):
+                if isinstance(details.get(key), str):
+                    details[key] = self._scrub_path(details[key])
+        if isinstance(scrubbed.get("description"), str):
+            scrubbed["description"] = self._scrub_path(scrubbed["description"])
+        if isinstance(scrubbed.get("title"), str):
+            scrubbed["title"] = self._scrub_path(scrubbed["title"])
+        return scrubbed
+
     def _send_status(self) -> None:
         self._send_to_electron({"type": "status", "data": self._build_status_payload()})
     
@@ -685,6 +728,8 @@ class Coordinator:
                     user_id=user.get("id"),
                     device_id=device_id,
                 )
+                # Reset heartbeat circuit breaker on fresh auth.
+                self._consecutive_heartbeat_failures = 0
                 self._device_metadata.update(
                     {
                         "name": device.get("name", self._device_metadata.get("name")),

@@ -73,9 +73,12 @@ async def register_device(
     
     Called when HavenAI desktop app is first set up.
     """
-    # Check if device with same machine_id already exists
+    # Check if device with same machine_id already exists for THIS user.
     if device_data.machine_id:
-        existing = db.query(Device).filter(Device.machine_id == device_data.machine_id).first()
+        existing = db.query(Device).filter(
+            Device.machine_id == device_data.machine_id,
+            Device.user_id == user.id,
+        ).first()
         if existing:
             existing.name = device_data.name
             existing.os_version = device_data.os_version

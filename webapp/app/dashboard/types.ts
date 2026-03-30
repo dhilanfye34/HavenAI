@@ -113,7 +113,6 @@ export interface MonitorControlState {
   desired: Record<MonitorModule, boolean>;
   state: Record<MonitorModule, MonitorLifecycleState>;
   blockers: Record<MonitorModule, string[]>;
-  grants: Record<MonitorModule, boolean>;
   updated_at: string;
 }
 

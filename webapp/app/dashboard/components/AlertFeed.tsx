@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { SecurityAlert } from '../types';
 import { AlertItem } from './AlertItem';
 
@@ -10,11 +10,18 @@ interface AlertFeedProps {
 
 export function AlertFeed({ alerts, latestAlertId, onSelectAlert }: AlertFeedProps) {
   const [filter, setFilter] = useState<'priority' | 'all' | 'critical' | 'warning' | 'info'>('priority');
+  const [injectedId, setInjectedId] = useState<string | null>(null);
   const filteredAlerts = useMemo(() => {
     if (filter === 'all') return alerts;
     if (filter === 'priority') return alerts.filter((alert) => alert.severity !== 'info');
     return alerts.filter((alert) => alert.severity === filter);
   }, [alerts, filter]);
+
+  const handleSelect = useCallback((alert: SecurityAlert) => {
+    onSelectAlert(alert);
+    setInjectedId(alert.id);
+    setTimeout(() => setInjectedId(null), 1500);
+  }, [onSelectAlert]);
 
   return (
     <section className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-4">
@@ -45,7 +52,16 @@ export function AlertFeed({ alerts, latestAlertId, onSelectAlert }: AlertFeedPro
       </div>
       <div className="max-h-[240px] space-y-2 overflow-y-auto pr-1">
         {filteredAlerts.map((alert) => (
-          <AlertItem key={alert.id} alert={alert} isNewest={latestAlertId === alert.id} onSelect={onSelectAlert} />
+          <div key={alert.id} className="relative">
+            <AlertItem alert={alert} isNewest={latestAlertId === alert.id} onSelect={handleSelect} />
+            {injectedId === alert.id && (
+              <div className="absolute inset-x-0 -bottom-1 flex justify-center">
+                <span className="animate-fade-in rounded-full bg-cyan-500/20 px-2.5 py-0.5 text-[10px] font-medium text-cyan-300 backdrop-blur">
+                  Added to chat context
+                </span>
+              </div>
+            )}
+          </div>
         ))}
         {filteredAlerts.length === 0 && (
           <p className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-center text-xs text-gray-600">

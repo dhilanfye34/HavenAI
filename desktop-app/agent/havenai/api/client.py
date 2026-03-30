@@ -48,30 +48,27 @@ class APIClient:
         return headers
     
     def _save_config(self) -> None:
-        """Save credentials to config file."""
+        """Save non-secret config to file. Tokens are NEVER written to disk —
+        they are held in memory only, provided by the Electron shell via stdin."""
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         config = {
-            "access_token": self.access_token,
-            "refresh_token": self.refresh_token,
             "device_id": self.device_id,
             "user_id": self.user_id,
-            "base_url": self.base_url
+            "base_url": self.base_url,
         }
         CONFIG_FILE.write_text(json.dumps(config, indent=2))
-        logger.debug("Config saved")
-    
+        logger.debug("Config saved (tokens excluded)")
+
     def _load_config(self) -> bool:
-        """Load credentials from config file."""
+        """Load non-secret config from file."""
         if CONFIG_FILE.exists():
             try:
                 config = json.loads(CONFIG_FILE.read_text())
-                self.access_token = config.get("access_token")
-                self.refresh_token = config.get("refresh_token")
                 self.device_id = config.get("device_id")
                 self.user_id = config.get("user_id")
                 if config.get("base_url"):
                     self.base_url = config.get("base_url")
-                logger.info("Loaded saved credentials")
+                logger.info("Loaded saved config (tokens provided at runtime)")
                 return True
             except Exception as e:
                 logger.warning(f"Failed to load config: {e}")
@@ -278,7 +275,7 @@ class APIClient:
         try:
             response = self.client.post(
                 f"{self.base_url}/auth/refresh",
-                params={"refresh_token": self.refresh_token}
+                json={"refresh_token": self.refresh_token}
             )
             response.raise_for_status()
             data = response.json()

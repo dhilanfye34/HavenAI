@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.models import User
-from app.schemas import UserCreate, UserLogin, AuthResponse, UserResponse, TokenResponse
+from app.schemas import UserCreate, UserLogin, AuthResponse, UserResponse, TokenResponse, RefreshRequest
 from app.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
 
 router = APIRouter()
@@ -86,12 +86,12 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
+async def refresh_token(body: RefreshRequest, db: Session = Depends(get_db)):
     """
     Get a new access token using a refresh token.
     """
     # Decode refresh token
-    payload = decode_token(refresh_token)
+    payload = decode_token(body.refresh_token)
     
     if payload is None:
         raise HTTPException(

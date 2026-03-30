@@ -217,16 +217,27 @@ class LocalDB:
     # Maintenance
     # ------------------------------------------------------------------
 
-    def prune(self, days: int = 7) -> int:
-        cutoff = time.time() - (days * 86400)
+    def prune(self, event_days: int = 7, alert_days: int = 30) -> int:
+        """Prune old data with differentiated retention.
+
+        Events and snapshots are deleted after ``event_days`` (default 7).
+        Alerts are retained longer — ``alert_days`` (default 30) — so users
+        can review recent alert history even after raw telemetry is gone.
+        """
+        now = time.time()
+        event_cutoff = now - (event_days * 86400)
+        alert_cutoff = now - (alert_days * 86400)
         total = 0
         try:
             with self._connect() as conn:
-                for table, col in [("events", "timestamp"), ("alerts", "created_at"), ("agent_snapshots", "timestamp")]:
-                    cur = conn.execute(f"DELETE FROM {table} WHERE {col} < ?", (cutoff,))
-                    total += cur.rowcount
+                cur = conn.execute("DELETE FROM events WHERE timestamp < ?", (event_cutoff,))
+                total += cur.rowcount
+                cur = conn.execute("DELETE FROM agent_snapshots WHERE timestamp < ?", (event_cutoff,))
+                total += cur.rowcount
+                cur = conn.execute("DELETE FROM alerts WHERE created_at < ?", (alert_cutoff,))
+                total += cur.rowcount
             if total:
-                logger.info("LocalDB pruned %d rows older than %d days", total, days)
+                logger.info("LocalDB pruned %d rows (events >%dd, alerts >%dd)", total, event_days, alert_days)
         except Exception as e:
             logger.debug("prune failed: %s", e)
         return total

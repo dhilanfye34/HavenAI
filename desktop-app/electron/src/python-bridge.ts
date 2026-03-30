@@ -100,6 +100,11 @@ export class PythonBridge extends EventEmitter {
       },
     });
 
+    // Handle stdin errors (EPIPE when Python exits while we're writing).
+    this.process.stdin?.on('error', (err: any) => {
+      console.warn('Python stdin error (process may be shutting down):', err?.code || err?.message);
+    });
+
     // Handle stdout (JSON messages from Python)
     this.process.stdout?.on('data', (data: Buffer) => {
       this.handleOutput(data.toString());
@@ -155,13 +160,19 @@ export class PythonBridge extends EventEmitter {
    * Send a message to the Python agent
    */
   send(message: object): void {
-    if (!this.process?.stdin) {
+    if (!this.process?.stdin || this.process.killed) {
       console.error('Cannot send message: Python agent not running');
       return;
     }
 
     const json = JSON.stringify(message);
-    this.process.stdin.write(json + '\n');
+    try {
+      this.process.stdin.write(json + '\n');
+    } catch (err: any) {
+      // The Python process may have exited between the check and the write.
+      // EPIPE / ERR_STREAM_DESTROYED are expected during shutdown — log and move on.
+      console.warn('Failed to write to Python stdin (process may be shutting down):', err?.code || err?.message);
+    }
   }
 
   /**
@@ -217,6 +228,15 @@ export class PythonBridge extends EventEmitter {
         break;
       case 'device_registered':
         this.emit('device-registered', data);
+        break;
+      case 'local-events':
+        this.emit('local-events', data);
+        break;
+      case 'local-alerts':
+        this.emit('local-alerts', data);
+        break;
+      case 'local-stats':
+        this.emit('local-stats', data);
         break;
       default:
         console.log('Unknown message type from Python:', type);

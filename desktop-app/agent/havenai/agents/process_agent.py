@@ -133,10 +133,12 @@ class ProcessAgent(Agent):
                     proc_data["parent_name"] = "unknown"
                 
                 current_processes.append(proc_data)
-                
-                # Check if this is a new process
+
+                # Check if this is a new process, filtering out known system noise.
                 if pinfo['pid'] not in self.known_pids:
-                    new_processes.append(proc_data)
+                    proc_name_lower = (pinfo['name'] or '').lower()
+                    if proc_name_lower not in {s.lower() for s in SYSTEM_PROCESSES}:
+                        new_processes.append(proc_data)
                     
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue

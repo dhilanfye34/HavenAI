@@ -78,6 +78,8 @@ export default function DashboardPage() {
     injectAlertContext,
     injectRecommendationContext,
     injectRuntimeContext,
+    removeContextEvent,
+    clearContextEvents,
     sendMessage,
   } = useChat();
 
@@ -111,10 +113,8 @@ export default function DashboardPage() {
     injectRuntimeContext(runtimeStatus);
   }, [injectRuntimeContext, runtimeStatus]);
 
-  useEffect(() => {
-    if (!latestAlertId || alerts.length === 0) return;
-    injectAlertContext(alerts[0]);
-  }, [alerts, injectAlertContext, latestAlertId]);
+  // Alerts are only injected into chat context when the user explicitly clicks
+  // one in the AlertFeed. Auto-injection was flooding the context window.
 
   const recommendations = useMemo<Recommendation[]>(() => {
     const hasErrors = agents.some((agent) => agent.status === 'error');
@@ -339,6 +339,8 @@ export default function DashboardPage() {
                 connectionLabel={connectionLabel}
                 contextEvents={contextEvents}
                 onSendMessage={sendMessage}
+                onRemoveContext={removeContextEvent}
+                onClearContext={clearContextEvents}
               />
             </div>
           </div>

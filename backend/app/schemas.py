@@ -17,6 +17,13 @@ class UserCreate(BaseModel):
     password: str
     full_name: Optional[str] = None
 
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        return v
+
 
 class UserLogin(BaseModel):
     """Schema for user login"""
@@ -49,6 +56,11 @@ class AuthResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+
+
+class RefreshRequest(BaseModel):
+    """Schema for token refresh"""
+    refresh_token: str
 
 
 # ============== Device Schemas ==============

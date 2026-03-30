@@ -8,16 +8,47 @@
  * - Shows native notifications
  */
 
-import { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, safeStorage } from 'electron';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { execSync } from 'child_process';
 import { PythonBridge } from './python-bridge';
 import Store from 'electron-store';
 
 // Persistent storage for settings
 const store = new Store();
+
+// --- Encrypted credential helpers using OS keychain (macOS Keychain / Windows DPAPI) ---
+function encryptAndStore(key: string, value: string): void {
+  if (safeStorage.isEncryptionAvailable()) {
+    const encrypted = safeStorage.encryptString(value);
+    store.set(key, encrypted.toString('base64'));
+  } else {
+    // Fallback to plaintext if OS encryption is unavailable (rare).
+    store.set(key, value);
+  }
+}
+
+function decryptFromStore(key: string): string | undefined {
+  const raw = store.get(key) as string | undefined;
+  if (!raw) return undefined;
+  if (safeStorage.isEncryptionAvailable()) {
+    try {
+      const buffer = Buffer.from(raw, 'base64');
+      return safeStorage.decryptString(buffer);
+    } catch {
+      // May be a legacy plaintext value — return as-is and it will be re-encrypted on next save.
+      return raw;
+    }
+  }
+  return raw;
+}
+
+function deleteFromStore(key: string): void {
+  store.delete(key);
+}
 
 // Global references
 let mainWindow: BrowserWindow | null = null;
@@ -196,12 +227,17 @@ function getDeviceMetadata() {
     linux: 'linux',
   };
 
+  // Build a stable hardware-derived fingerprint that is hard to guess.
+  const cpuModel = os.cpus()[0]?.model || 'unknown-cpu';
+  const raw = `${os.hostname()}-${os.arch()}-${cpuModel}-${os.totalmem()}-${process.platform}`;
+  const machineId = crypto.createHash('sha256').update(raw).digest('hex').slice(0, 32);
+
   return {
     name: os.hostname(),
     os_type: platformMap[process.platform] || process.platform,
     os_version: os.release(),
     app_version: app.getVersion(),
-    machine_id: `${os.hostname()}-${os.arch()}`,
+    machine_id: machineId,
   };
 }
 
@@ -365,12 +401,12 @@ function initPythonBridge(): void {
     pythonBridge?.send({ type: 'get_status' });
 
     // If credentials were persisted, immediately hydrate Python session.
-    const accessToken = store.get('accessToken') as string | undefined;
+    const accessToken = decryptFromStore('accessToken');
     if (accessToken) {
       pythonBridge?.send({
         type: 'sync_auth',
         access_token: accessToken,
-        refresh_token: store.get('refreshToken') as string | undefined,
+        refresh_token: decryptFromStore('refreshToken'),
         user: store.get('user') || {},
         device_id: store.get('deviceId') as string | undefined,
         device: getDeviceMetadata(),
@@ -532,28 +568,28 @@ ipcMain.handle('stop-agent', () => {
   return true;
 });
 
-// Get stored credentials
+// Get stored credentials (tokens are encrypted at rest)
 ipcMain.handle('get-credentials', () => {
   return {
-    accessToken: store.get('accessToken'),
-    refreshToken: store.get('refreshToken'),
+    accessToken: decryptFromStore('accessToken'),
+    refreshToken: decryptFromStore('refreshToken'),
     user: store.get('user'),
     deviceId: store.get('deviceId'),
   };
 });
 
-// Save credentials
+// Save credentials (tokens encrypted via OS keychain)
 ipcMain.handle('save-credentials', (_, credentials) => {
   if (credentials?.accessToken) {
-    store.set('accessToken', credentials.accessToken);
+    encryptAndStore('accessToken', credentials.accessToken);
   } else {
-    store.delete('accessToken');
+    deleteFromStore('accessToken');
   }
 
   if (credentials?.refreshToken) {
-    store.set('refreshToken', credentials.refreshToken);
+    encryptAndStore('refreshToken', credentials.refreshToken);
   } else {
-    store.delete('refreshToken');
+    deleteFromStore('refreshToken');
   }
 
   if (credentials?.user) {
@@ -572,8 +608,8 @@ ipcMain.handle('save-credentials', (_, credentials) => {
 
 // Clear credentials (logout)
 ipcMain.handle('clear-credentials', () => {
-  store.delete('accessToken');
-  store.delete('refreshToken');
+  deleteFromStore('accessToken');
+  deleteFromStore('refreshToken');
   store.delete('user');
   store.delete('deviceId');
   return true;
@@ -597,10 +633,10 @@ ipcMain.handle('agent-login', (_, payload) => {
 
 ipcMain.handle('sync-agent-auth', (_, payload) => {
   if (payload?.accessToken) {
-    store.set('accessToken', payload.accessToken);
+    encryptAndStore('accessToken', payload.accessToken);
   }
   if (payload?.refreshToken) {
-    store.set('refreshToken', payload.refreshToken);
+    encryptAndStore('refreshToken', payload.refreshToken);
   }
   if (payload?.user) {
     store.set('user', payload.user);
