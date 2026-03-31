@@ -5,8 +5,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'HavenAI - AI-Powered Cybersecurity',
-  description: 'Personal cybersecurity agent that learns your behavior and protects you from threats.',
+  title: 'HavenAI - Personal Cybersecurity',
+  description: 'Your personal security guardian. Protects your files, apps, network, and email.',
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} dark`}>
+    <html lang="en" className={`${inter.variable}`}>
       <body className="font-sans antialiased">{children}</body>
     </html>
   );

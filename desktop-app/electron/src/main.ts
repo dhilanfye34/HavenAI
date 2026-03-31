@@ -424,16 +424,17 @@ function initPythonBridge(): void {
     });
     emitMonitorControlState();
 
-    // Restore email monitor credentials if saved
+    // Restore email monitor credentials if saved (password encrypted via OS keychain)
     const savedEmail = store.get('emailMonitor') as any;
-    if (savedEmail?.email && savedEmail?.password) {
+    const savedEmailPassword = decryptFromStore('emailMonitorPassword');
+    if (savedEmail?.email && savedEmailPassword) {
       pythonBridge?.send({
         type: 'configure_email',
         data: {
           host: savedEmail.imapHost,
           port: savedEmail.imapPort,
           user: savedEmail.email,
-          password: Buffer.from(savedEmail.password, 'base64').toString('utf-8'),
+          password: savedEmailPassword,
         },
       });
     }
@@ -688,12 +689,13 @@ ipcMain.handle('agent-logout', () => {
 
 ipcMain.handle('configure-email-monitor', (_, payload) => {
   if (payload?.email && payload?.password) {
+    // Store email config with encrypted password via OS keychain
     store.set('emailMonitor', {
       email: payload.email,
       imapHost: payload.imapHost,
       imapPort: payload.imapPort,
-      password: Buffer.from(payload.password).toString('base64'),
     });
+    encryptAndStore('emailMonitorPassword', payload.password);
   }
 
   pythonBridge?.send({
@@ -705,6 +707,13 @@ ipcMain.handle('configure-email-monitor', (_, payload) => {
       password: payload?.password,
     },
   });
+  return true;
+});
+
+ipcMain.handle('disconnect-email-monitor', () => {
+  store.delete('emailMonitor');
+  store.delete('emailMonitorPassword');
+  pythonBridge?.send({ type: 'disconnect_email' });
   return true;
 });
 

@@ -15,8 +15,6 @@ export default function HomePage() {
 
     updateAuthState();
 
-    // storage event does not fire in the same window for local updates,
-    // so keep a lightweight poll for desktop route swaps.
     const timer = window.setInterval(updateAuthState, 1000);
     window.addEventListener('storage', updateAuthState);
 
@@ -28,10 +26,10 @@ export default function HomePage() {
 
   if (hasToken === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f]">
+      <div className="flex min-h-screen items-center justify-center bg-haven-bg">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
-          <p className="text-sm text-gray-500">Loading...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          <p className="text-sm text-haven-text-tertiary">Loading...</p>
         </div>
       </div>
     );

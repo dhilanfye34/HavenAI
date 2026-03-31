@@ -2,218 +2,174 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Light mode (default) ── */
 :root {
-  --haven-bg: #0a0a0f;
-  --haven-surface: rgba(255, 255, 255, 0.03);
+  --haven-bg: #F8F9FB;
+  --haven-surface: #FFFFFF;
+  --haven-surface-hover: #F1F5F9;
+  --haven-border: rgba(0, 0, 0, 0.08);
+  --haven-border-hover: rgba(0, 0, 0, 0.15);
+  --haven-text: #1A1A2E;
+  --haven-text-secondary: #64748B;
+  --haven-text-tertiary: #94A3B8;
+  --haven-chat-bg: #FFFFFF;
+  --haven-safe-bg: rgba(34, 197, 94, 0.08);
+  --haven-danger-bg: rgba(239, 68, 68, 0.08);
+  --haven-warning-bg: rgba(245, 158, 11, 0.08);
+}
+
+/* ── Dark mode ── */
+.dark {
+  --haven-bg: #13131A;
+  --haven-surface: rgba(255, 255, 255, 0.06);
+  --haven-surface-hover: rgba(255, 255, 255, 0.10);
   --haven-border: rgba(255, 255, 255, 0.08);
-  --haven-cyan: #22d3ee;
-  --haven-violet: #8b5cf6;
-  --haven-glow-cyan: rgba(34, 211, 238, 0.15);
-  --haven-glow-violet: rgba(139, 92, 246, 0.15);
+  --haven-border-hover: rgba(255, 255, 255, 0.15);
+  --haven-text: #E2E8F0;
+  --haven-text-secondary: #94A3B8;
+  --haven-text-tertiary: #64748B;
+  --haven-chat-bg: #1E1E2A;
+  --haven-safe-bg: rgba(34, 197, 94, 0.12);
+  --haven-danger-bg: rgba(239, 68, 68, 0.12);
+  --haven-warning-bg: rgba(245, 158, 11, 0.12);
 }
 
 body {
   background: var(--haven-bg);
-  color: #e2e8f0;
+  color: var(--haven-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Animated gradient mesh background */
+/* ── Component classes ── */
+/* Using plain CSS for variable-based colors since @apply can't resolve CSS vars */
+.card {
+  border-radius: 1rem;
+  border: 1px solid var(--haven-border);
+  background: var(--haven-surface);
+}
+
+.card-hover {
+  border-radius: 1rem;
+  border: 1px solid var(--haven-border);
+  background: var(--haven-surface);
+  transition: all 0.2s;
+}
+.card-hover:hover {
+  border-color: var(--haven-border-hover);
+  background: var(--haven-surface-hover);
+}
+
+.input-field {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--haven-border);
+  background: var(--haven-surface);
+  padding: 0.75rem 1rem;
+  color: var(--haven-text);
+  outline: none;
+  transition: all 0.2s;
+}
+.input-field::placeholder {
+  color: var(--haven-text-tertiary);
+}
+.input-field:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:bg-blue-600 active:scale-[0.98];
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-3 font-medium transition-all duration-200 active:scale-[0.98];
+    border-color: var(--haven-border);
+    color: var(--haven-text-secondary);
+  }
+  .btn-secondary:hover {
+    border-color: var(--haven-border-hover);
+    background: var(--haven-surface-hover);
+    color: var(--haven-text);
+  }
+  .status-dot {
+    @apply inline-block h-2 w-2 rounded-full;
+  }
+  .status-dot-safe { @apply status-dot bg-green-500; }
+  .status-dot-warning { @apply status-dot bg-amber-500; }
+  .status-dot-danger { @apply status-dot bg-red-500; }
+  .status-dot-inactive { @apply status-dot bg-gray-400; }
+}
+
+/* ── Legacy glass classes for login/landing ── */
+.glass-card {
+  border-radius: 1rem;
+  border: 1px solid var(--haven-border);
+  background: var(--haven-surface);
+}
+.glass-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--haven-border);
+  background: var(--haven-surface);
+  padding: 0.75rem 1rem;
+  color: var(--haven-text);
+  outline: none;
+  transition: all 0.2s;
+}
+.glass-input::placeholder {
+  color: var(--haven-text-tertiary);
+}
+.glass-input:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ── Landing page effects (kept for marketing pages only) ── */
 @keyframes gradient-shift {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
 }
 
-.bg-gradient-mesh {
-  background: 
-    radial-gradient(ellipse at 20% 50%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, rgba(6, 182, 212, 0.05) 0%, transparent 50%),
-    var(--haven-bg);
-}
-
 .bg-gradient-mesh-animated {
-  background: 
-    radial-gradient(ellipse at 20% 50%, rgba(34, 211, 238, 0.1) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, rgba(6, 182, 212, 0.06) 0%, transparent 50%),
-    linear-gradient(135deg, #0a0a0f 0%, #0f0a1a 50%, #0a0a0f 100%);
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(34, 197, 94, 0.04) 0%, transparent 50%),
+    #13131A;
   background-size: 200% 200%;
   animation: gradient-shift 15s ease infinite;
 }
 
-/* Dot grid pattern overlay */
 .bg-dot-pattern {
   background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
-/* Hero orb glow effect */
-@keyframes orb-pulse {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
-  50% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.8; }
-}
-@keyframes orb-rotate {
-  0% { transform: translate(-50%, -50%) rotate(0deg); }
-  100% { transform: translate(-50%, -50%) rotate(360deg); }
-}
-.hero-orb {
-  position: absolute;
-  top: 38%;
-  left: 50%;
-  width: 500px;
-  height: 500px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.35) 0%, rgba(109, 40, 217, 0.2) 30%, rgba(76, 29, 149, 0.08) 55%, transparent 70%);
-  filter: blur(40px);
-  animation: orb-pulse 8s ease-in-out infinite;
-  pointer-events: none;
-}
-.hero-orb-ring {
-  position: absolute;
-  top: 38%;
-  left: 50%;
-  width: 420px;
-  height: 420px;
-  border-radius: 50%;
-  border: 1px solid rgba(139, 92, 246, 0.12);
-  animation: orb-rotate 30s linear infinite;
-  pointer-events: none;
-}
-.hero-orb-ring::before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: 50%;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: rgba(139, 92, 246, 0.6);
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
-}
-@media (max-width: 768px) {
-  .hero-orb { width: 320px; height: 320px; }
-  .hero-orb-ring { width: 260px; height: 260px; }
-}
-
-/* Scattered star particles */
-.stars-field {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.stars-field::before,
-.stars-field::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.5) 50%, transparent 50%),
-    radial-gradient(1px 1px at 25% 40%, rgba(255,255,255,0.3) 50%, transparent 50%),
-    radial-gradient(1px 1px at 45% 10%, rgba(255,255,255,0.4) 50%, transparent 50%),
-    radial-gradient(1px 1px at 60% 60%, rgba(255,255,255,0.3) 50%, transparent 50%),
-    radial-gradient(1px 1px at 75% 25%, rgba(255,255,255,0.5) 50%, transparent 50%),
-    radial-gradient(1px 1px at 90% 50%, rgba(255,255,255,0.3) 50%, transparent 50%),
-    radial-gradient(1px 1px at 15% 70%, rgba(255,255,255,0.4) 50%, transparent 50%),
-    radial-gradient(1px 1px at 35% 85%, rgba(255,255,255,0.3) 50%, transparent 50%),
-    radial-gradient(1px 1px at 55% 35%, rgba(255,255,255,0.35) 50%, transparent 50%),
-    radial-gradient(1px 1px at 80% 80%, rgba(255,255,255,0.4) 50%, transparent 50%),
-    radial-gradient(1.5px 1.5px at 5% 90%, rgba(255,255,255,0.5) 50%, transparent 50%),
-    radial-gradient(1.5px 1.5px at 50% 50%, rgba(255,255,255,0.25) 50%, transparent 50%),
-    radial-gradient(1px 1px at 70% 5%, rgba(255,255,255,0.45) 50%, transparent 50%),
-    radial-gradient(1px 1px at 95% 70%, rgba(255,255,255,0.3) 50%, transparent 50%);
-  background-size: 100% 100%;
-}
-.stars-field::after {
-  background-image:
-    radial-gradient(1px 1px at 8% 52%, rgba(255,255,255,0.4) 50%, transparent 50%),
-    radial-gradient(1px 1px at 22% 18%, rgba(255,255,255,0.35) 50%, transparent 50%),
-    radial-gradient(1.5px 1.5px at 38% 72%, rgba(255,255,255,0.3) 50%, transparent 50%),
-    radial-gradient(1px 1px at 52% 88%, rgba(255,255,255,0.45) 50%, transparent 50%),
-    radial-gradient(1px 1px at 68% 32%, rgba(255,255,255,0.3) 50%, transparent 50%),
-    radial-gradient(1px 1px at 82% 62%, rgba(255,255,255,0.4) 50%, transparent 50%),
-    radial-gradient(1px 1px at 18% 42%, rgba(255,255,255,0.25) 50%, transparent 50%),
-    radial-gradient(1.5px 1.5px at 42% 8%, rgba(255,255,255,0.5) 50%, transparent 50%),
-    radial-gradient(1px 1px at 62% 78%, rgba(255,255,255,0.35) 50%, transparent 50%),
-    radial-gradient(1px 1px at 88% 15%, rgba(255,255,255,0.3) 50%, transparent 50%),
-    radial-gradient(1px 1px at 32% 95%, rgba(255,255,255,0.4) 50%, transparent 50%),
-    radial-gradient(1px 1px at 72% 48%, rgba(255,255,255,0.3) 50%, transparent 50%);
-  background-size: 100% 100%;
-}
-
-/* Violet top glow for page sections */
-.bg-top-glow {
-  background: 
-    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(139, 92, 246, 0.12) 0%, transparent 60%),
-    var(--haven-bg);
-}
-
-/* Section pill badge */
-@layer components {
-  .section-badge {
-    @apply inline-flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/[0.08] px-4 py-1.5 text-sm font-medium text-violet-300;
-  }
-}
-
-/* Glassmorphism card */
-@layer components {
-  .glass-card {
-    @apply rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl;
-  }
-  .glass-card-hover {
-    @apply glass-card transition-all duration-300 hover:border-white/[0.15] hover:bg-white/[0.05] hover:shadow-[0_0_30px_rgba(34,211,238,0.08)];
-  }
-  .glass-input {
-    @apply w-full rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 text-white placeholder-gray-500 outline-none transition-all duration-300 focus:border-cyan-400/50 focus:shadow-[0_0_0_3px_rgba(34,211,238,0.1)] focus:bg-white/[0.08];
-  }
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 font-semibold text-white transition-all duration-300 hover:shadow-[0_0_25px_rgba(34,211,238,0.3)] hover:brightness-110 active:scale-[0.98];
-  }
-  .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.05] px-6 py-3 font-medium text-gray-300 transition-all duration-300 hover:border-white/[0.2] hover:bg-white/[0.08] hover:text-white active:scale-[0.98];
-  }
-  .glow-cyan {
-    box-shadow: 0 0 20px rgba(34, 211, 238, 0.15), 0 0 60px rgba(34, 211, 238, 0.05);
-  }
-  .glow-violet {
-    box-shadow: 0 0 20px rgba(139, 92, 246, 0.15), 0 0 60px rgba(139, 92, 246, 0.05);
-  }
-}
-
-/* Entrance animations */
-@keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes scale-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(34, 211, 238, 0.2); }
-  50% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.4); }
-}
-@keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(12px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-/* Gradient text utility */
+/* ── Gradient text utility (for landing page) ── */
 .text-gradient {
-  background: linear-gradient(135deg, #22d3ee 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #3B82F6 0%, #8b5cf6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* Scrollbar styling */
+/* ── Section badge (for landing page) ── */
+.section-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(139, 92, 246, 0.08);
+  padding: 0.375rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #a78bfa;
+}
+
+/* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+::-webkit-scrollbar-thumb { background: var(--haven-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--haven-border-hover); }

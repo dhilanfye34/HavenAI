@@ -23,7 +23,7 @@ function toSecurityAlert(alert: any): SecurityAlert {
     details:
       alert?.details?.recommendation ||
       alert?.description ||
-      'Review this event in the command center.',
+      'Review this event for more details.',
   };
 }
 

@@ -51,29 +51,27 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center px-4">
-      <div className="bg-gradient-mesh-animated absolute inset-0 -z-10" />
-      <div className="bg-dot-pattern absolute inset-0 -z-10 opacity-30" />
+    <div className="relative flex min-h-screen items-center justify-center bg-haven-bg px-4">
 
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <Link href="/" className="group mb-4 inline-flex items-center gap-2 text-sm text-gray-500 transition hover:text-gray-300">
+          <Link href="/" className="group mb-4 inline-flex items-center gap-2 text-sm text-haven-text-tertiary transition hover:text-haven-text">
             <ArrowLeft className="h-4 w-4" />
             Back to home
           </Link>
           <div className="mt-4 flex items-center justify-center gap-2.5">
-            <Shield className="h-9 w-9 text-cyan-400" />
-            <span className="text-2xl font-bold tracking-tight text-white">HavenAI</span>
+            <Shield className="h-9 w-9 text-blue-500" />
+            <span className="text-2xl font-bold tracking-tight text-haven-text">HavenAI</span>
           </div>
         </div>
 
         <div className="glass-card p-8">
-          <h2 className="mb-6 text-center text-xl font-bold text-white">
+          <h2 className="mb-6 text-center text-xl font-bold text-haven-text">
             {isLogin ? 'Welcome back' : 'Create your account'}
           </h2>
 
           {error && (
-            <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            <div className="mb-6 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-300">
               {error}
             </div>
           )}
@@ -81,7 +79,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-400">
+                <label className="mb-1.5 block text-sm font-medium text-haven-text-secondary">
                   Full Name
                 </label>
                 <input
@@ -95,7 +93,7 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-400">
+              <label className="mb-1.5 block text-sm font-medium text-haven-text-secondary">
                 Email
               </label>
               <input
@@ -109,7 +107,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-400">
+              <label className="mb-1.5 block text-sm font-medium text-haven-text-secondary">
                 Password
               </label>
               <input
@@ -140,7 +138,7 @@ export default function LoginPage() {
           <div className="mt-6 text-center">
             <button
               onClick={() => { setIsLogin(!isLogin); setError(''); }}
-              className="text-sm text-cyan-400 transition hover:text-cyan-300"
+              className="text-sm text-blue-500 transition hover:text-blue-600"
             >
               {isLogin
                 ? "Don't have an account? Sign up"

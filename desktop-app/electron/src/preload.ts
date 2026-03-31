@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('havenai', {
     ipcRenderer.invoke('open-permissions-settings', target),
   configureEmailMonitor: (payload: { email: string; password: string; imapHost: string; imapPort: number }) =>
     ipcRenderer.invoke('configure-email-monitor', payload),
+  disconnectEmailMonitor: () => ipcRenderer.invoke('disconnect-email-monitor'),
   queryLocalEvents: (params: { kind?: string; since?: number; limit?: number }) =>
     ipcRenderer.invoke('query-local-events', params),
   queryLocalAlerts: (params: { since?: number; severityMin?: string; limit?: number }) =>
@@ -136,6 +137,7 @@ declare global {
       onLocalAlerts: (callback: (data: any) => void) => void;
       onLocalStats: (callback: (data: any) => void) => void;
       configureEmailMonitor: (payload: { email: string; password: string; imapHost: string; imapPort: number }) => Promise<boolean>;
+      disconnectEmailMonitor: () => Promise<boolean>;
       queryLocalEvents: (params: { kind?: string; since?: number; limit?: number }) => Promise<any>;
       queryLocalAlerts: (params: { since?: number; severityMin?: string; limit?: number }) => Promise<any>;
       getLocalStats: () => Promise<any>;

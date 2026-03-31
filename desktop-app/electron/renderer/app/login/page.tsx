@@ -54,8 +54,6 @@ export default function LoginPage() {
         });
       }
 
-      // Reload so page.tsx detects the token and renders the dashboard.
-      // router.push('/') breaks on file:// protocol in packaged Electron.
       window.location.reload();
     } catch (err: any) {
       setError(err.message || 'Failed to fetch');
@@ -65,24 +63,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center px-4">
-      <div className="bg-gradient-mesh-animated absolute inset-0 -z-10" />
-      <div className="bg-dot-pattern absolute inset-0 -z-10 opacity-30" />
-
+    <div className="flex min-h-screen items-center justify-center bg-haven-bg px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Shield className="h-12 w-12 text-cyan-400" />
-          <span className="text-2xl font-bold tracking-tight text-white">HavenAI</span>
-          <p className="text-sm text-gray-500">Connect your HavenAI account</p>
+          <Shield className="h-12 w-12 text-blue-500" />
+          <span className="text-2xl font-bold tracking-tight text-haven-text">HavenAI</span>
+          <p className="text-sm text-haven-text-tertiary">Connect your HavenAI account</p>
         </div>
 
-        <div className="glass-card p-8">
-          <h2 className="mb-6 text-center text-xl font-bold text-white">
+        <div className="card p-8">
+          <h2 className="mb-6 text-center text-xl font-bold text-haven-text">
             {isLogin ? 'Welcome back' : 'Create your account'}
           </h2>
 
           {error && (
-            <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            <div className="mb-6 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-300">
               {error}
             </div>
           )}
@@ -90,37 +85,37 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-400">Full Name</label>
+                <label className="mb-1.5 block text-sm font-medium text-haven-text-secondary">Full Name</label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="glass-input"
+                  className="input-field"
                   placeholder="John Doe"
                 />
               </div>
             )}
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-400">Email</label>
+              <label className="mb-1.5 block text-sm font-medium text-haven-text-secondary">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="glass-input"
+                className="input-field"
                 placeholder="you@example.com"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-400">Password</label>
+              <label className="mb-1.5 block text-sm font-medium text-haven-text-secondary">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="glass-input"
+                className="input-field"
                 placeholder="••••••••"
               />
             </div>
@@ -143,7 +138,7 @@ export default function LoginPage() {
           <div className="mt-6 text-center">
             <button
               onClick={() => { setIsLogin(!isLogin); setError(''); }}
-              className="text-sm text-cyan-400 transition hover:text-cyan-300"
+              className="text-sm text-blue-500 transition hover:text-blue-600"
             >
               {isLogin
                 ? "Don't have an account? Sign up"

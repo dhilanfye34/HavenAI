@@ -71,7 +71,7 @@ class Coordinator:
         self._last_heartbeat = 0
         self._heartbeat_interval = 60  # seconds
         self._consecutive_heartbeat_failures = 0
-        self._max_heartbeat_failures = 3  # stop trying after 3 consecutive failures
+        self._max_heartbeat_failures = 1  # stop trying after 1 failure — wait for fresh auth from Electron
         self._last_preferences_sync = 0.0
         self._preferences_sync_interval = 20.0
 
@@ -107,7 +107,7 @@ class Coordinator:
 
         # Local SQLite storage
         self.local_db = LocalDB()
-        self.local_db.prune(days=7)
+        self.local_db.prune(event_days=7)
         self._last_prune = time.time()
         self._prune_interval = 86400
     
@@ -172,7 +172,7 @@ class Coordinator:
             now = time.time()
             if now - self._last_prune >= self._prune_interval:
                 try:
-                    self.local_db.prune(days=7)
+                    self.local_db.prune(event_days=7)
                 except Exception as e:
                     logger.debug(f"Periodic prune failed: {e}")
                 self._last_prune = now
@@ -785,16 +785,23 @@ class Coordinator:
                     if isinstance(agent, EmailInboxAgent):
                         agent.configure(host, port, user, password)
                         break
-                import os
-                os.environ["HAVENAI_IMAP_HOST"] = host
-                os.environ["HAVENAI_IMAP_PORT"] = str(port)
-                os.environ["HAVENAI_IMAP_USER"] = user
-                os.environ["HAVENAI_IMAP_PASSWORD"] = password
 
             self._send_to_electron({
                 "type": "email-config-result",
                 "data": result
             })
+
+        elif msg_type == "disconnect_email":
+            for agent in self.always_on_agents:
+                if isinstance(agent, EmailInboxAgent):
+                    agent.disconnect()
+                    break
+            # Clean up any env vars that may have been set by older versions
+            import os
+            os.environ.pop("HAVENAI_IMAP_HOST", None)
+            os.environ.pop("HAVENAI_IMAP_PORT", None)
+            os.environ.pop("HAVENAI_IMAP_USER", None)
+            os.environ.pop("HAVENAI_IMAP_PASSWORD", None)
 
         elif msg_type == "query_events":
             data = message.get("data", {})

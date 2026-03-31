@@ -14,7 +14,7 @@ const assistantGreeting: ChatMessage = {
   id: 'assistant-welcome',
   role: 'assistant',
   content:
-    "Hi, I'm your HavenAI command assistant. Ask me what changed recently, whether anything looks risky, or what to do next.",
+    "Hi, I'm your HavenAI assistant. Ask me about your security, what's happening on your device, or what you should do next.",
   timestamp: new Date().toISOString(),
 };
 

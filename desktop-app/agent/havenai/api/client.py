@@ -287,7 +287,7 @@ class APIClient:
             logger.info("Access token refreshed")
             return True
         except Exception as e:
-            logger.error(f"Failed to refresh token: {e}")
+            logger.debug(f"Token refresh failed (expected if session expired): {e}")
             return False
 
     def get_setup_preferences(self) -> Optional[Dict[str, Any]]:
