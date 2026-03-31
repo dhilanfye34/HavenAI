@@ -69,5 +69,29 @@ class Settings(BaseSettings):
     )
 
 
+import logging
+
+_logger = logging.getLogger(__name__)
+
 # Global settings instance
 settings = Settings()
+
+
+def log_config_warnings() -> None:
+    """Log warnings for missing optional service credentials at startup."""
+    if not settings.sendgrid_api_key or settings.sendgrid_api_key.startswith("your-"):
+        _logger.warning(
+            "SENDGRID_API_KEY is not configured — email notifications will be skipped."
+        )
+    if not settings.twilio_account_sid or settings.twilio_account_sid.startswith("your-"):
+        _logger.warning(
+            "TWILIO_ACCOUNT_SID is not configured — SMS and voice call notifications will be skipped."
+        )
+    if not settings.openai_api_key:
+        _logger.warning(
+            "OPENAI_API_KEY is not configured — AI chat assistant will not function."
+        )
+    if settings.jwt_secret == "dev-secret-change-this-in-production" and settings.environment != "development":
+        _logger.warning(
+            "JWT_SECRET is still the default value — change it before deploying to production!"
+        )

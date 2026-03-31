@@ -12,9 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import auth, devices, alerts, health, downloads, chat, setup
 from app.db.database import engine, Base
+from app.config import log_config_warnings
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+# Log warnings for any missing optional credentials
+log_config_warnings()
 
 # Create FastAPI app
 app = FastAPI(

@@ -122,7 +122,7 @@ export interface SecurityAlert {
   timestamp: string;
   source: string;
   description: string;
-  details: string;
+  details: string | Record<string, any>;
 }
 
 export interface Recommendation {

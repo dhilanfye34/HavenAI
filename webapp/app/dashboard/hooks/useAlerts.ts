@@ -21,9 +21,9 @@ function toSecurityAlert(alert: any): SecurityAlert {
     source: alert?.agent || alert?.type || 'Desktop Agent',
     description: alert?.title || alert?.description || 'Security event detected.',
     details:
-      alert?.details?.recommendation ||
-      alert?.description ||
-      'Review this event for more details.',
+      (alert?.details && typeof alert.details === 'object')
+        ? alert.details
+        : alert?.description || 'Review this event for more details.',
   };
 }
 

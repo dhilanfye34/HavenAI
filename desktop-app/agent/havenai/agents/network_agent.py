@@ -304,9 +304,9 @@ class NetworkAgent(Agent):
         if baseline_hosts:
             # Check if IP or hostname is known
             is_known = (
-                remote_ip in baseline_hosts or 
+                remote_ip in baseline_hosts or
                 hostname in baseline_hosts or
-                any(hostname.endswith(h) for h in baseline_hosts if h)
+                (hostname is not None and any(hostname.endswith(h) for h in baseline_hosts if h))
             )
             if not is_known and len(baseline_hosts) > 5:
                 risk += 0.3

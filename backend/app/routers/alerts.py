@@ -4,12 +4,14 @@ Alert Routes
 Handles security alert creation and retrieval.
 """
 
+from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
 from datetime import datetime, timedelta
 import json
+import time
 
 from app.db.database import get_db
 from app.db.models import User, Device, Alert, UserSetupPreferences
@@ -18,6 +20,26 @@ from app.dependencies import get_current_user
 from app.services.notifications import NotificationService, get_notification_service
 
 router = APIRouter()
+
+
+# ── Simple in-memory rate limiter for alert creation ──
+_alert_rate: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT = 30  # max alerts per window
+_RATE_WINDOW = 60  # seconds
+
+
+def _check_alert_rate(user_id: str) -> None:
+    """Raise 429 if user exceeds alert creation rate limit."""
+    now = time.time()
+    timestamps = _alert_rate[user_id]
+    # Prune old entries
+    _alert_rate[user_id] = [t for t in timestamps if now - t < _RATE_WINDOW]
+    if len(_alert_rate[user_id]) >= _RATE_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded: max {_RATE_LIMIT} alerts per {_RATE_WINDOW}s.",
+        )
+    _alert_rate[user_id].append(now)
 
 
 @router.post("", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
@@ -29,9 +51,11 @@ async def create_alert(
 ):
     """
     Create a new security alert.
-    
+
     Called by the desktop app when a threat is detected.
     """
+    _check_alert_rate(user.id)
+
     # Verify device belongs to user
     device = db.query(Device).filter(
         Device.id == alert_data.device_id,
@@ -182,7 +206,7 @@ async def get_alert_stats(
     # Unresolved
     unresolved = db.query(Alert).filter(
         Alert.user_id == user.id,
-        Alert.is_resolved == False
+        Alert.is_resolved.is_(False)
     ).count()
     
     return AlertStatsResponse(

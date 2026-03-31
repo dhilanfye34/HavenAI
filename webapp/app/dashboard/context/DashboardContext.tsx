@@ -319,6 +319,28 @@ export function DashboardProvider({
     injectRuntimeContext(runtimeStatus);
   }, [injectRuntimeContext, runtimeStatus]);
 
+  // Auto-detect email connection from agent status
+  // If EmailInboxAgent is active but UI doesn't know, sync the state
+  useEffect(() => {
+    if (emailConnection.status === 'connected') return; // already know
+    const emailAgent = agents.find((a) => a.id === 'EmailInboxAgent');
+    if (emailAgent && emailAgent.status === 'active') {
+      setEmailConnection({
+        status: 'connected',
+        message: 'Connected (restored from previous session)',
+        email: '',
+        providerName: '',
+      });
+      // Also persist so it survives tab switches
+      localStorage.setItem('haven-email-connection', JSON.stringify({
+        status: 'connected',
+        message: 'Connected (restored from previous session)',
+        email: '',
+        providerName: '',
+      }));
+    }
+  }, [agents, emailConnection.status]);
+
   // Email connection helpers
   const setEmailConnected = (email: string, providerName: string, message: string) => {
     const state: EmailConnectionState = { status: 'connected', message, email, providerName };

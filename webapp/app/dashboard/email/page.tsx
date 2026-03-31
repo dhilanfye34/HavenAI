@@ -174,6 +174,7 @@ export default function EmailPage() {
   const [appPassword, setAppPassword] = useState('');
   const [manualHost, setManualHost] = useState('');
   const [manualPort, setManualPort] = useState('993');
+  const [showSetup, setShowSetup] = useState(false);
 
   const testStatus = emailConnection.status === 'connected' ? 'success'
     : emailConnection.status === 'testing' ? 'testing'
@@ -217,6 +218,7 @@ export default function EmailPage() {
       if (result?.success) {
         setEmailConnected(emailAddress, provider?.name || '', result.message || 'Connected successfully!');
         setAppPassword('');
+        setShowSetup(false);
       } else {
         setEmailError(result?.message || 'Connection failed. Check your credentials and try again.');
       }
@@ -374,13 +376,56 @@ export default function EmailPage() {
         </div>
       )}
 
-      {/* Setup form — only show when not connected */}
-      {isDesktopRuntime && !isConnected && (
+      {/* Connected account info */}
+      {isDesktopRuntime && isConnected && !showSetup && (
+        <div className="card p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10">
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-haven-text">
+                  {emailConnection.email || 'Email account connected'}
+                </p>
+                <p className="text-xs text-haven-text-tertiary">
+                  {emailConnection.providerName
+                    ? `${emailConnection.providerName} account`
+                    : 'Scanning inbox every 20 seconds'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSetup(true)}
+              className="text-xs font-medium text-blue-500 transition hover:text-blue-600"
+            >
+              Switch account
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Setup form — show when not connected OR when switching */}
+      {isDesktopRuntime && (!isConnected || showSetup) && (
         <div className="card p-6">
-          <h2 className="mb-1 text-base font-semibold text-haven-text">Connect your email</h2>
-          <p className="mb-5 text-sm text-haven-text-secondary">
-            HavenAI needs an app-specific password to scan your inbox. This is different from your regular password.
-          </p>
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="mb-1 text-base font-semibold text-haven-text">
+                {showSetup && isConnected ? 'Switch email account' : 'Connect your email'}
+              </h2>
+              <p className="text-sm text-haven-text-secondary">
+                HavenAI needs an app-specific password to scan your inbox. This is different from your regular password.
+              </p>
+            </div>
+            {showSetup && isConnected && (
+              <button
+                onClick={() => setShowSetup(false)}
+                className="text-xs font-medium text-haven-text-tertiary transition hover:text-haven-text"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
 
           <div className="space-y-5 max-w-md">
             <div>

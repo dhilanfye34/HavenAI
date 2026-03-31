@@ -51,7 +51,7 @@ export function useChat() {
           source: alert.source,
           severity: alert.severity,
           timestamp: alert.timestamp,
-          description: `${alert.description} Details: ${alert.details}`,
+          description: `${alert.description}${typeof alert.details === 'string' ? ` Details: ${alert.details}` : ''}`,
         },
         ...current,
       ].slice(0, 20);

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from base64 import b64encode
+from html import escape as html_escape
 from typing import Dict, Optional
 import json
 import logging
@@ -256,8 +257,11 @@ class NotificationService:
             )
 
         # Basic TwiML for voice alerts.
+        # Escape title to prevent XML injection in TwiML.
+        safe_title = html_escape(alert.title or "", quote=True)
+        safe_severity = html_escape(alert.severity or "", quote=True)
         message = (
-            f"Haven A I {alert.severity} alert. {alert.title}. "
+            f"Haven A I {safe_severity} alert. {safe_title}. "
             "Check your Haven dashboard for details."
         )
         twiml = f"<Response><Say>{message}</Say></Response>"
