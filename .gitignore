@@ -69,3 +69,5 @@ htmlcov/
 desktop-app/electron/release/
 
 desktop-app/electron/release/mac-arm64/
+
+.claude
