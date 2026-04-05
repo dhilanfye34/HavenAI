@@ -13,14 +13,12 @@
     "next": "14.0.4",
     "react": "^18",
     "react-dom": "^18",
-    "react-markdown": "^10.1.0",
-    "three": "^0.183.2"
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@types/three": "^0.183.1",
     "autoprefixer": "^10.0.1",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.0.4",

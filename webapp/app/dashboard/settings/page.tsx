@@ -5,6 +5,7 @@ import {
   Bell,
   Eye,
   FileSearch,
+  Link2Off,
   LogOut,
   Mail,
   Monitor,
@@ -17,6 +18,7 @@ import {
   Wifi,
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
+import { listDevices, unlinkDevice, DeviceInfo } from '../services/setupApi';
 
 function ToggleSwitch({
   checked,
@@ -120,11 +122,20 @@ export default function SettingsPage() {
   const [smsPhone, setSmsPhone] = useState('');
   const [voicePhone, setVoicePhone] = useState('');
   const [isDark, setIsDark] = useState(false);
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [unlinking, setUnlinking] = useState<string | null>(null);
 
   useEffect(() => {
     setSmsPhone(preferences?.sms_phone ?? '');
     setVoicePhone(preferences?.voice_phone ?? '');
   }, [preferences?.sms_phone, preferences?.voice_phone]);
+
+  // Fetch linked devices (webapp only — desktop shows single device info via IPC)
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token || isDesktopRuntime) return;
+    listDevices(token).then(setDevices).catch(() => {});
+  }, [isDesktopRuntime]);
 
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains('dark'));
@@ -147,6 +158,35 @@ export default function SettingsPage() {
   const handleVoicePhoneSave = () => {
     const normalized = normalizePhone(voicePhone);
     if (normalized) savePreferences({ voice_phone: normalized });
+  };
+
+  const handleUnlinkDevice = async (deviceId: string) => {
+    if (!confirm('Are you sure you want to unlink this device? It will stop all monitoring on that device and allow another account to claim it.')) {
+      return;
+    }
+
+    if (isDesktopRuntime) {
+      // Desktop: use IPC to unlink and logout
+      const havenai = (window as any).havenai;
+      if (havenai?.unlinkDevice) {
+        await havenai.unlinkDevice();
+        // The device-unlinked event will clear credentials and redirect
+        logout();
+      }
+    } else {
+      // Webapp: call API directly
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+      setUnlinking(deviceId);
+      try {
+        await unlinkDevice(token, deviceId);
+        setDevices((prev) => prev.filter((d) => d.id !== deviceId));
+      } catch {
+        // Silently handle — device may already be unlinked
+      } finally {
+        setUnlinking(null);
+      }
+    }
   };
 
   return (
@@ -278,15 +318,61 @@ export default function SettingsPage() {
 
       {/* Device */}
       <SectionCard title="Device">
-        <SettingRow
-          icon={Monitor}
-          label="Desktop app"
-          description={isDesktopRuntime ? 'Connected' : 'Not connected'}
-        >
-          <span className={`text-xs font-medium ${isDesktopRuntime ? 'text-green-500' : 'text-haven-text-tertiary'}`}>
-            {isDesktopRuntime ? 'Active' : 'Inactive'}
-          </span>
-        </SettingRow>
+        {isDesktopRuntime ? (
+          <>
+            <SettingRow
+              icon={Monitor}
+              label="Desktop app"
+              description="Connected"
+            >
+              <span className="text-xs font-medium text-green-500">Active</span>
+            </SettingRow>
+            <div className="py-4">
+              <button
+                onClick={() => handleUnlinkDevice('current')}
+                className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-red-500 transition hover:bg-red-50 dark:hover:bg-red-500/10"
+              >
+                <Link2Off className="h-4 w-4" />
+                Unlink this device
+              </button>
+              <p className="mt-1.5 pl-1 text-xs text-haven-text-tertiary">
+                Removes this device from your account. Another account will be able to use Haven on this device.
+              </p>
+            </div>
+          </>
+        ) : devices.length > 0 ? (
+          devices.map((device) => (
+            <div key={device.id} className="flex items-center justify-between gap-4 py-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
+                  <Monitor className="h-[18px] w-[18px] text-blue-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-haven-text">{device.name}</p>
+                  <p className="text-xs text-haven-text-tertiary">
+                    {device.os_type} {device.os_version ? `· ${device.os_version}` : ''} · {device.is_online ? 'Online' : 'Offline'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleUnlinkDevice(device.id)}
+                disabled={unlinking === device.id}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-500 transition hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50"
+              >
+                <Link2Off className="h-3.5 w-3.5" />
+                {unlinking === device.id ? 'Unlinking...' : 'Unlink'}
+              </button>
+            </div>
+          ))
+        ) : (
+          <SettingRow
+            icon={Monitor}
+            label="No devices linked"
+            description="Install the HavenAI desktop app to protect your device"
+          >
+            <span className="text-xs font-medium text-haven-text-tertiary">Inactive</span>
+          </SettingRow>
+        )}
       </SectionCard>
 
       {/* Account */}

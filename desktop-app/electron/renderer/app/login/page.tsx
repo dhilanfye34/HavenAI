@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Shield, Loader2 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -12,6 +12,25 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+
+  useEffect(() => {
+    const havenai = (window as any).havenai;
+    if (havenai?.onDeviceLinkedError) {
+      havenai.onDeviceLinkedError((message: string) => {
+        setError(message);
+        setLoading(false);
+        // Clear local storage since credentials were already wiped by main process
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+      });
+    }
+    return () => {
+      if (havenai?.removeAllListeners) {
+        havenai.removeAllListeners('device-linked-error');
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

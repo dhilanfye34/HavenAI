@@ -25,6 +25,7 @@ from .network_agent import NetworkAgent
 from .email_inbox_agent import EmailInboxAgent
 from .message_agent import MessageAgent
 from havenai.api import get_client
+from havenai.api.client import DeviceLinkedError
 from havenai.storage.local_db import LocalDB
 
 logger = logging.getLogger(__name__)
@@ -418,6 +419,20 @@ class Coordinator:
             )
             logger.info("Registered desktop device with backend")
             return True
+        except DeviceLinkedError as e:
+            self._send_to_electron(
+                {
+                    "type": "device_linked_error",
+                    "message": str(e),
+                }
+            )
+            # Clear session since this account can't use this device
+            if self.api_client:
+                self.api_client.clear_session()
+            self._auth_status["state"] = "unauthenticated"
+            self._auth_status["last_error"] = str(e)
+            logger.warning(f"Device linked to another account: {e}")
+            return False
         except Exception as e:
             self._auth_status["last_error"] = str(e)
             logger.warning(f"Device registration failed: {e}")
@@ -825,7 +840,32 @@ class Coordinator:
             stats = self.local_db.get_stats()
             self._send_to_electron({"type": "local-stats", "data": stats})
 
+        elif msg_type == "unlink_device":
+            # Fully sever device-account bond.
+            # Stop all device monitors, clear local data, unlink from backend.
+            for pref_key in self._monitor_config_map:
+                self._desired_preferences[pref_key] = False
+            self._sync_monitor_agents()
+            self.local_db.clear()
+
+            success = False
+            if self.api_client:
+                success = self.api_client.unlink_device()
+                self.api_client.clear_session()
+
+            self._auth_status["state"] = "unauthenticated"
+            self._auth_status["last_error"] = None
+            self._local_preferences_override = False
+            self._send_to_electron({"type": "device_unlinked", "success": success})
+            self._send_status()
+
         elif msg_type == "logout":
+            # Stop device-bound monitors (file, process, network) but keep
+            # email monitoring active — it's account-level, not device-level.
+            for pref_key in self._monitor_config_map:
+                self._desired_preferences[pref_key] = False
+            self._sync_monitor_agents()
+
             if self.api_client:
                 self.api_client.clear_session()
             self._auth_status["state"] = "unauthenticated"

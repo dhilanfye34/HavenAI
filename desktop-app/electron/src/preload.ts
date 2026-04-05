@@ -33,6 +33,10 @@ contextBridge.exposeInMainWorld('havenai', {
   grantMonitorPermission: (module: 'file' | 'process' | 'network') =>
     ipcRenderer.invoke('grant-monitor-permission', module),
   logoutAgent: () => ipcRenderer.invoke('agent-logout'),
+  unlinkDevice: () => ipcRenderer.invoke('unlink-device'),
+  onDeviceUnlinked: (callback: (data: any) => void) => {
+    ipcRenderer.on('device-unlinked', (_, data) => callback(data));
+  },
   openPermissionsSettings: (target?: 'file' | 'process' | 'network' | 'alerts' | 'all') =>
     ipcRenderer.invoke('open-permissions-settings', target),
   configureEmailMonitor: (payload: { email: string; password: string; imapHost: string; imapPort: number }) =>
@@ -64,6 +68,9 @@ contextBridge.exposeInMainWorld('havenai', {
   },
   onAgentDevice: (callback: (device: any) => void) => {
     ipcRenderer.on('agent-device', (_, device) => callback(device));
+  },
+  onDeviceLinkedError: (callback: (message: string) => void) => {
+    ipcRenderer.on('device-linked-error', (_, message) => callback(message));
   },
   onMonitorState: (callback: (state: any) => void) => {
     ipcRenderer.on('monitor-state', (_, state) => callback(state));
@@ -115,6 +122,8 @@ declare global {
       setMonitorDesired: (payload: { module: 'file' | 'process' | 'network'; enabled: boolean }) => Promise<any>;
       grantMonitorPermission: (module: 'file' | 'process' | 'network') => Promise<any>;
       logoutAgent: () => Promise<boolean>;
+      unlinkDevice: () => Promise<boolean>;
+      onDeviceUnlinked: (callback: (data: any) => void) => void;
       openPermissionsSettings: (
         target?: 'file' | 'process' | 'network' | 'alerts' | 'all',
       ) => Promise<boolean>;
@@ -131,6 +140,7 @@ declare global {
       onAgentAuth: (callback: (auth: any) => void) => void;
       onAgentPreferences: (callback: (prefs: any) => void) => void;
       onAgentDevice: (callback: (device: any) => void) => void;
+      onDeviceLinkedError: (callback: (message: string) => void) => void;
       onMonitorState: (callback: (state: any) => void) => void;
       onEmailConfigResult: (callback: (result: any) => void) => void;
       onLocalEvents: (callback: (data: any) => void) => void;

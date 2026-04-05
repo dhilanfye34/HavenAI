@@ -217,6 +217,20 @@ class LocalDB:
     # Maintenance
     # ------------------------------------------------------------------
 
+    def clear(self) -> None:
+        """Wipe all device-specific data (events, alerts, snapshots).
+
+        Called when unlinking a device to prevent data leakage between accounts.
+        """
+        try:
+            with self._connect() as conn:
+                conn.execute("DELETE FROM events")
+                conn.execute("DELETE FROM alerts")
+                conn.execute("DELETE FROM agent_snapshots")
+            logger.info("LocalDB cleared all device-specific data")
+        except Exception as e:
+            logger.debug("clear failed: %s", e)
+
     def prune(self, event_days: int = 7, alert_days: int = 30) -> int:
         """Prune old data with differentiated retention.
 

@@ -73,22 +73,28 @@ async def register_device(
     
     Called when HavenAI desktop app is first set up.
     """
-    # Check if device with same machine_id already exists for THIS user.
+    # Check if device with same machine_id already exists.
     if device_data.machine_id:
         existing = db.query(Device).filter(
             Device.machine_id == device_data.machine_id,
-            Device.user_id == user.id,
         ).first()
         if existing:
-            existing.name = device_data.name
-            existing.os_version = device_data.os_version
-            existing.app_version = device_data.app_version
-            existing.last_seen = datetime.now(timezone.utc)
-            existing.is_active = True
-            db.commit()
-            db.refresh(existing)
-            return _device_to_response(existing)
-    
+            # Device belongs to THIS user — update in place.
+            if str(existing.user_id) == str(user.id):
+                existing.name = device_data.name
+                existing.os_version = device_data.os_version
+                existing.app_version = device_data.app_version
+                existing.last_seen = datetime.now(timezone.utc)
+                existing.is_active = True
+                db.commit()
+                db.refresh(existing)
+                return _device_to_response(existing)
+            # Device belongs to a DIFFERENT user — block registration.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This device is linked to another account. To use Haven on this device, the other account must unlink it first from Settings."
+            )
+
     device = Device(
         user_id=user.id,
         name=device_data.name,
@@ -194,6 +200,35 @@ async def delete_device(
     
     db.delete(device)
     db.commit()
+
+
+@router.post("/{device_id}/unlink", status_code=status.HTTP_200_OK)
+async def unlink_device(
+    device_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Unlink a device from the current user's account.
+
+    Removes the device record so it can be claimed by another account.
+    Device-specific alerts are preserved under the user for history.
+    """
+    device = db.query(Device).filter(
+        Device.id == device_id,
+        Device.user_id == user.id
+    ).first()
+
+    if not device:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found"
+        )
+
+    db.delete(device)
+    db.commit()
+
+    return {"detail": "Device unlinked successfully"}
 
 
 @router.post("/{device_id}/heartbeat", response_model=DeviceResponse)

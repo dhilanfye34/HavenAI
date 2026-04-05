@@ -534,6 +534,30 @@ function initPythonBridge(): void {
     mainWindow?.webContents.send('agent-device', data);
   });
 
+  pythonBridge.on('device-linked-error', (message: string) => {
+    // Device is linked to another account — clear credentials and notify renderer
+    deleteFromStore('accessToken');
+    deleteFromStore('refreshToken');
+    store.delete('user');
+    store.delete('deviceId');
+    mainWindow?.webContents.send('device-linked-error', message);
+  });
+
+  pythonBridge.on('device-unlinked', (data: any) => {
+    // Device fully unlinked — clear all local state
+    deleteFromStore('accessToken');
+    deleteFromStore('refreshToken');
+    store.delete('user');
+    store.delete('deviceId');
+    const resetDesired: MonitorDesired = { file: false, process: false, network: false };
+    const resetState: MonitorStateMap = { file: 'off', process: 'off', network: 'off' };
+    const resetBlockers: MonitorBlockers = { file: [], process: [], network: [] };
+    store.set('monitorDesired', resetDesired);
+    store.set('monitorState', resetState);
+    store.set('monitorBlockers', resetBlockers);
+    mainWindow?.webContents.send('device-unlinked', data);
+  });
+
   pythonBridge.on('error', (error: string) => {
     console.error('Python bridge error:', error);
     mainWindow?.webContents.send('agent-status', { status: 'error', error });
@@ -683,7 +707,20 @@ ipcMain.handle('grant-monitor-permission', async (_, module: MonitorModule) => {
 
 ipcMain.handle('agent-logout', () => {
   pythonBridge?.send({ type: 'logout' });
-  store.delete('deviceId');
+  // Reset device monitor state but keep device linked (deviceId stays)
+  const resetDesired: MonitorDesired = { file: false, process: false, network: false };
+  const resetState: MonitorStateMap = { file: 'off', process: 'off', network: 'off' };
+  const resetBlockers: MonitorBlockers = { file: [], process: [], network: [] };
+  store.set('monitorDesired', resetDesired);
+  store.set('monitorState', resetState);
+  store.set('monitorBlockers', resetBlockers);
+  // Note: deviceId is NOT deleted — device stays linked to account.
+  // Email monitor config is NOT cleared — it's account-level.
+  return true;
+});
+
+ipcMain.handle('unlink-device', () => {
+  pythonBridge?.send({ type: 'unlink_device' });
   return true;
 });
 

@@ -12,6 +12,11 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
+class DeviceLinkedError(Exception):
+    """Raised when the device is already linked to a different account."""
+    pass
+
 # Config file location
 CONFIG_DIR = Path.home() / ".havenai"
 CONFIG_FILE = CONFIG_DIR / "config.json"
@@ -200,6 +205,9 @@ class APIClient:
                 "machine_id": machine_id,
             }
         )
+        if response.status_code == 409:
+            detail = response.json().get("detail", "This device is linked to another account.")
+            raise DeviceLinkedError(detail)
         response.raise_for_status()
         data = response.json()
         
@@ -209,7 +217,25 @@ class APIClient:
         
         logger.info(f"Registered device: {name} ({self.device_id})")
         return data
-    
+
+    def unlink_device(self) -> bool:
+        """Unlink the current device from this account."""
+        if not self.device_id:
+            return False
+        try:
+            response = self.client.post(
+                f"{self.base_url}/devices/{self.device_id}/unlink",
+                headers=self._get_headers(),
+            )
+            response.raise_for_status()
+            self.device_id = None
+            self._save_config()
+            logger.info("Device unlinked successfully")
+            return True
+        except Exception as e:
+            logger.warning(f"Device unlink failed: {e}")
+            return False
+
     def send_alert(self, alert: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Send an alert to the backend.

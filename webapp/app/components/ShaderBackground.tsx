@@ -1,144 +1,143 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useRef, useEffect } from "react"
+
+const VERTEX = `#version 300 es
+precision highp float;
+in vec4 position;
+void main(){gl_Position=position;}`
+
+const FRAGMENT = `#version 300 es
+precision highp float;
+out vec4 O;
+uniform vec2 resolution;
+uniform float time;
+
+void main(void) {
+  vec2 uv = (gl_FragCoord.xy * 2.0 - resolution.xy) / min(resolution.x, resolution.y);
+  float t = time * 0.05;
+  float lineWidth = 0.0015;
+
+  float r = 0.0, g = 0.0, b = 0.0;
+
+  for(int j = 0; j < 3; j++){
+    float ch = 0.0;
+    for(int i = 0; i < 5; i++){
+      ch += lineWidth * float(i*i) / abs(
+        fract(t - 0.01 * float(j) + float(i) * 0.01) * 5.0
+        - length(uv) + mod(uv.x + uv.y, 0.2)
+      );
+    }
+    if(j == 0) r = ch;
+    if(j == 1) g = ch;
+    if(j == 2) b = ch;
+  }
+
+  vec3 violet = vec3(0.545, 0.361, 0.965);
+  vec3 cyan   = vec3(0.133, 0.827, 0.933);
+  vec3 deep   = vec3(0.04, 0.04, 0.06);
+
+  float energy = (r + g + b) / 3.0;
+  float hueShift = sin(time * 0.02 + length(uv) * 1.5) * 0.5 + 0.5;
+  vec3 glow = mix(violet, cyan, hueShift);
+
+  vec3 color = deep + glow * energy * 1.2;
+
+  float dist = length(uv);
+  float vignette = smoothstep(1.8, 0.4, dist);
+  color *= vignette;
+
+  O = vec4(color, 1.0);
+}`
 
 interface ShaderBackgroundProps {
   className?: string
 }
 
 export function ShaderBackground({ className = "" }: ShaderBackgroundProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const cleanupRef = useRef<(() => void) | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const rafRef = useRef(0)
 
   useEffect(() => {
-    if (!containerRef.current) return
+    const canvas = canvasRef.current
+    if (!canvas) return
 
-    let cancelled = false
-    const container = containerRef.current
+    const gl = canvas.getContext("webgl2")
+    if (!gl) return
 
-    import("three").then((THREE) => {
-      if (cancelled || !container) return
+    const dpr = Math.min(1.5, window.devicePixelRatio)
 
-      const vertexShader = `
-        void main() {
-          gl_Position = vec4(position, 1.0);
-        }
-      `
-
-      const fragmentShader = `
-        precision highp float;
-        uniform vec2 resolution;
-        uniform float time;
-
-        void main(void) {
-          vec2 uv = (gl_FragCoord.xy * 2.0 - resolution.xy) / min(resolution.x, resolution.y);
-          float t = time * 0.05;
-          float lineWidth = 0.0015;
-
-          float r = 0.0;
-          float g = 0.0;
-          float b = 0.0;
-
-          for(int j = 0; j < 3; j++){
-            float ch = 0.0;
-            for(int i = 0; i < 5; i++){
-              ch += lineWidth * float(i*i) / abs(
-                fract(t - 0.01 * float(j) + float(i) * 0.01) * 5.0
-                - length(uv) + mod(uv.x + uv.y, 0.2)
-              );
-            }
-            if(j == 0) r = ch;
-            if(j == 1) g = ch;
-            if(j == 2) b = ch;
-          }
-
-          vec3 violet = vec3(0.545, 0.361, 0.965);
-          vec3 cyan   = vec3(0.133, 0.827, 0.933);
-          vec3 deep   = vec3(0.04, 0.04, 0.06);
-
-          float energy = (r + g + b) / 3.0;
-          float hueShift = sin(time * 0.02 + length(uv) * 1.5) * 0.5 + 0.5;
-          vec3 glow = mix(violet, cyan, hueShift);
-
-          vec3 color = deep + glow * energy * 1.2;
-
-          float dist = length(uv);
-          float vignette = smoothstep(1.8, 0.4, dist);
-          color *= vignette;
-
-          gl_FragColor = vec4(color, 1.0);
-        }
-      `
-
-      const camera = new THREE.Camera()
-      camera.position.z = 1
-
-      const scene = new THREE.Scene()
-      const geometry = new THREE.PlaneGeometry(2, 2)
-
-      const uniforms = {
-        time: { value: 1.0 },
-        resolution: { value: new THREE.Vector2() },
+    const compile = (type: number, src: string) => {
+      const s = gl.createShader(type)!
+      gl.shaderSource(s, src)
+      gl.compileShader(s)
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(s))
       }
+      return s
+    }
 
-      const material = new THREE.ShaderMaterial({
-        uniforms,
-        vertexShader,
-        fragmentShader,
-      })
+    const vs = compile(gl.VERTEX_SHADER, VERTEX)
+    const fs = compile(gl.FRAGMENT_SHADER, FRAGMENT)
 
-      const mesh = new THREE.Mesh(geometry, material)
-      scene.add(mesh)
+    const prog = gl.createProgram()!
+    gl.attachShader(prog, vs)
+    gl.attachShader(prog, fs)
+    gl.linkProgram(prog)
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true })
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.error(gl.getProgramInfoLog(prog))
+    }
 
-      const canvas = renderer.domElement
-      canvas.style.display = "block"
-      canvas.style.width = "100%"
-      canvas.style.height = "100%"
-      container.appendChild(canvas)
+    const buf = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,1,-1,-1,1,1,1,-1]), gl.STATIC_DRAW)
 
-      const onResize = () => {
-        const width = container.clientWidth
-        const height = container.clientHeight
-        if (width === 0 || height === 0) return
-        renderer.setSize(width, height, false)
-        uniforms.resolution.value.set(width * renderer.getPixelRatio(), height * renderer.getPixelRatio())
-      }
+    const pos = gl.getAttribLocation(prog, "position")
+    gl.enableVertexAttribArray(pos)
+    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0)
 
-      onResize()
-      window.addEventListener("resize", onResize)
+    const uRes = gl.getUniformLocation(prog, "resolution")
+    const uTime = gl.getUniformLocation(prog, "time")
 
-      let animId = 0
-      const animate = () => {
-        animId = requestAnimationFrame(animate)
-        uniforms.time.value += 0.06
-        renderer.render(scene, camera)
-      }
-      animate()
+    const resize = () => {
+      canvas.width = canvas.clientWidth * dpr
+      canvas.height = canvas.clientHeight * dpr
+      gl.viewport(0, 0, canvas.width, canvas.height)
+    }
 
-      cleanupRef.current = () => {
-        cancelAnimationFrame(animId)
-        window.removeEventListener("resize", onResize)
-        if (container.contains(canvas)) container.removeChild(canvas)
-        renderer.dispose()
-        geometry.dispose()
-        material.dispose()
-      }
-    })
+    resize()
+    window.addEventListener("resize", resize)
+
+    let t = 1.0
+    const loop = () => {
+      t += 0.06
+      gl.clearColor(0, 0, 0, 1)
+      gl.clear(gl.COLOR_BUFFER_BIT)
+      gl.useProgram(prog)
+      gl.uniform2f(uRes, canvas.width, canvas.height)
+      gl.uniform1f(uTime, t)
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+      rafRef.current = requestAnimationFrame(loop)
+    }
+
+    rafRef.current = requestAnimationFrame(loop)
 
     return () => {
-      cancelled = true
-      cleanupRef.current?.()
+      cancelAnimationFrame(rafRef.current)
+      window.removeEventListener("resize", resize)
+      gl.deleteProgram(prog)
+      gl.deleteShader(vs)
+      gl.deleteShader(fs)
+      gl.deleteBuffer(buf)
     }
   }, [])
 
   return (
-    <div
-      ref={containerRef}
-      className={`absolute inset-0 ${className}`}
-      style={{ overflow: "hidden" }}
+    <canvas
+      ref={canvasRef}
+      className={`absolute inset-0 h-full w-full ${className}`}
+      style={{ background: "#0a0a0f" }}
     />
   )
 }

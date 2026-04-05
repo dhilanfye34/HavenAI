@@ -12,6 +12,8 @@ import {
   HardDrive,
   Wifi,
   ArrowRight,
+  Shield,
+  Sparkles,
 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
@@ -49,6 +51,12 @@ const platformIcons: Record<string, React.ReactNode> = {
   macos: <Apple className="h-7 w-7" />,
   windows: <Monitor className="h-7 w-7" />,
   linux: <Terminal className="h-7 w-7" />,
+};
+
+const platformColors: Record<string, { border: string; glow: string; text: string; bg: string }> = {
+  macos: { border: 'border-violet-500/20', glow: 'rgba(139, 92, 246, 0.08)', text: 'text-violet-400', bg: 'bg-violet-500/10' },
+  windows: { border: 'border-cyan-500/20', glow: 'rgba(34, 211, 238, 0.08)', text: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+  linux: { border: 'border-amber-500/20', glow: 'rgba(245, 158, 11, 0.08)', text: 'text-amber-400', bg: 'bg-amber-500/10' },
 };
 
 export default function DownloadPage() {
@@ -105,12 +113,17 @@ export default function DownloadPage() {
 
   return (
     <div className="relative min-h-screen bg-[#0a0a0f] text-white">
-      <ShaderHeroCanvas className="opacity-40 fixed" />
+      {/* Shader background behind hero only */}
+      <div className="absolute top-0 left-0 h-[70vh] w-full" style={{ zIndex: 0 }}>
+        <ShaderHeroCanvas className="opacity-30" />
+      </div>
+      <div className="pointer-events-none absolute top-[40vh] left-0 h-[30vh] w-full bg-gradient-to-b from-transparent to-[#0a0a0f]" style={{ zIndex: 0 }} />
+
       <div className="relative" style={{ zIndex: 1 }}>
       <Navbar />
 
       {/* Hero */}
-      <section className="relative overflow-hidden pt-32 pb-12">
+      <section className="relative overflow-hidden pt-32 pb-16">
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="section-badge mb-6 justify-center">
             <Download className="h-4 w-4" />
@@ -126,11 +139,14 @@ export default function DownloadPage() {
         </div>
       </section>
 
-      {/* Detected platform download */}
+      {/* Detected platform — primary download */}
       {!loading && detectedDownload && (
-        <section className="mx-auto max-w-lg px-6 py-8">
-          <div className="glass-card p-8 text-center">
-            <div className="mb-4 flex justify-center text-cyan-400">
+        <section className="mx-auto max-w-xl px-6 pb-8">
+          <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8 text-center">
+            {/* Subtle glow */}
+            <div className="pointer-events-none absolute -top-20 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full blur-3xl" style={{ background: platformColors[detectedDownload.platform]?.glow }} />
+
+            <div className={`relative mb-3 inline-flex rounded-2xl ${platformColors[detectedDownload.platform]?.bg} p-4 ${platformColors[detectedDownload.platform]?.text}`}>
               {platformIcons[detectedDownload.platform]}
             </div>
             <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -145,18 +161,18 @@ export default function DownloadPage() {
               Download for {detectedDownload.label}
             </a>
 
-            <p className="mt-3 text-xs text-gray-600">
+            <p className="mt-3 text-xs text-gray-500">
               {detectedDownload.filename} &middot; {detectedDownload.size}
             </p>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-left text-sm">
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-left text-sm">
                 <p className="text-xs text-gray-500">Requires</p>
-                <p className="text-gray-200">{detectedDownload.min_os}</p>
+                <p className="text-gray-300">{detectedDownload.min_os}</p>
               </div>
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-left text-sm">
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-left text-sm">
                 <p className="text-xs text-gray-500">Architecture</p>
-                <p className="text-gray-200">{detectedDownload.arch}</p>
+                <p className="text-gray-300">{detectedDownload.arch}</p>
               </div>
             </div>
           </div>
@@ -169,45 +185,52 @@ export default function DownloadPage() {
           {detected ? 'Other platforms' : 'Choose your platform'}
         </h3>
         <div className="grid gap-4 md:grid-cols-3">
-          {(detected ? otherPlatforms : Object.values(downloads?.platforms ?? {})).map((p) => (
-            <div key={p.platform} className="glass-card-hover flex flex-col items-center p-6 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.05] text-cyan-400">
-                {platformIcons[p.platform]}
+          {(detected ? otherPlatforms : Object.values(downloads?.platforms ?? {})).map((p) => {
+            const colors = platformColors[p.platform];
+            return (
+              <div key={p.platform} className={`group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.04]`}>
+                <div className="pointer-events-none absolute -top-16 left-1/2 h-32 w-32 -translate-x-1/2 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100" style={{ background: colors?.glow }} />
+                <div className={`relative mb-4 inline-flex rounded-2xl ${colors?.bg} p-3.5 ${colors?.text}`}>
+                  {platformIcons[p.platform]}
+                </div>
+                <h4 className="text-lg font-semibold">{p.label}</h4>
+                <p className="mt-1 text-xs text-gray-500">
+                  {p.size} &middot; {p.arch}
+                </p>
+                <a
+                  href={p.url}
+                  className="btn-secondary mt-4 gap-1.5 !px-5 !py-2 text-sm"
+                >
+                  <Download className="h-4 w-4" />
+                  Download
+                </a>
               </div>
-              <h4 className="text-lg font-semibold">{p.label}</h4>
-              <p className="mt-1 text-xs text-gray-500">
-                {p.size} &middot; {p.arch}
-              </p>
-              <a
-                href={p.url}
-                className="btn-secondary mt-4 gap-1.5 !px-5 !py-2 text-sm"
-              >
-                <Download className="h-4 w-4" />
-                Download
-              </a>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
       {/* Setup steps */}
-      <section className="py-16">
+      <section className="py-20">
         <div className="mx-auto max-w-4xl px-6">
-          <h2 className="mb-12 text-center text-2xl font-bold tracking-tight">
+          <h2 className="mb-14 text-center text-2xl font-bold tracking-tight md:text-3xl">
             Get started in <span className="text-gradient">3 steps</span>
           </h2>
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="relative grid gap-6 md:grid-cols-3">
+            {/* Connection line behind steps */}
+            <div className="pointer-events-none absolute top-8 left-[16.67%] right-[16.67%] hidden h-px bg-gradient-to-r from-violet-500/20 via-cyan-500/20 to-emerald-500/20 md:block" />
+
             {[
-              { step: 1, title: 'Download & Install', desc: 'Download HavenAI for your OS and run the installer. Takes less than a minute.' },
-              { step: 2, title: 'Sign In', desc: 'Log in with your HavenAI account so alerts sync to the web dashboard.' },
-              { step: 3, title: "You're Protected", desc: 'HavenAI runs in the background, monitoring files, processes, and network.' },
-            ].map(({ step, title, desc }) => (
-              <div key={step} className="text-center">
-                <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 text-sm font-bold text-white">
+              { step: 1, title: 'Download & Install', desc: 'Download HavenAI for your OS and run the installer. Takes less than a minute.', color: 'from-violet-500 to-purple-600' },
+              { step: 2, title: 'Sign In', desc: 'Log in with your HavenAI account so alerts sync to the web dashboard.', color: 'from-cyan-500 to-blue-600' },
+              { step: 3, title: "You're Protected", desc: 'HavenAI runs in the background, monitoring files, processes, and network.', color: 'from-emerald-500 to-teal-600' },
+            ].map(({ step, title, desc, color }) => (
+              <div key={step} className="relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center">
+                <div className={`relative mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${color} text-sm font-bold text-white shadow-lg`}>
                   {step}
                 </div>
-                <h4 className="mb-2 font-semibold text-white">{title}</h4>
-                <p className="text-sm text-gray-500">{desc}</p>
+                <h4 className="mb-2 text-base font-semibold text-white">{title}</h4>
+                <p className="text-sm leading-relaxed text-gray-500">{desc}</p>
               </div>
             ))}
           </div>
@@ -217,46 +240,50 @@ export default function DownloadPage() {
       {/* What gets monitored */}
       <section className="py-16">
         <div className="mx-auto max-w-4xl px-6">
-          <div className="glass-card p-10">
-            <h3 className="mb-8 text-center text-lg font-bold">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10">
+            <div className="mb-2 flex justify-center">
+              <div className="section-badge mb-4">
+                <Shield className="h-4 w-4" />
+                Coverage
+              </div>
+            </div>
+            <h3 className="mb-8 text-center text-xl font-bold">
               What the desktop agent monitors
             </h3>
-            <div className="grid gap-6 text-center md:grid-cols-3">
-              <div className="flex flex-col items-center gap-2">
-                <HardDrive className="h-7 w-7 text-cyan-400" />
-                <span className="font-medium">File Activity</span>
-                <span className="text-xs text-gray-500">Downloads, new executables, suspicious file names</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <Cpu className="h-7 w-7 text-violet-400" />
-                <span className="font-medium">Processes</span>
-                <span className="text-xs text-gray-500">New spawns, unusual parent-child chains</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <Wifi className="h-7 w-7 text-emerald-400" />
-                <span className="font-medium">Network</span>
-                <span className="text-xs text-gray-500">Suspicious connections, unusual ports</span>
-              </div>
+            <div className="grid gap-6 md:grid-cols-3">
+              {[
+                { icon: HardDrive, label: 'File Activity', desc: 'Downloads, new executables, suspicious file names', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+                { icon: Cpu, label: 'Processes', desc: 'New spawns, unusual parent-child chains', color: 'text-violet-400', bg: 'bg-violet-500/10' },
+                { icon: Wifi, label: 'Network', desc: 'Suspicious connections, unusual ports', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+              ].map(({ icon: Icon, label, desc, color, bg }) => (
+                <div key={label} className="flex flex-col items-center gap-3 text-center">
+                  <div className={`inline-flex rounded-xl ${bg} p-3 ${color}`}>
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <span className="font-medium text-white">{label}</span>
+                  <span className="text-xs leading-relaxed text-gray-500">{desc}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
       {/* System requirements */}
-      <section className="py-12 pb-20">
+      <section className="py-12 pb-24">
         <div className="mx-auto max-w-2xl px-6">
           <h3 className="mb-6 text-center text-sm font-semibold uppercase tracking-wider text-gray-500">
             System requirements
           </h3>
           <div className="space-y-3">
             {[
-              { label: 'macOS', value: 'macOS 12 (Monterey) or later, Intel or Apple Silicon' },
-              { label: 'Windows', value: 'Windows 10 64-bit or later, 4 GB RAM' },
-              { label: 'Linux', value: 'Ubuntu 20.04+ / Fedora 34+, x64, 4 GB RAM' },
+              { label: 'macOS', value: 'macOS 12 (Monterey) or later, Intel or Apple Silicon', platform: 'macos' },
+              { label: 'Windows', value: 'Windows 10 64-bit or later, 4 GB RAM', platform: 'windows' },
+              { label: 'Linux', value: 'Ubuntu 20.04+ / Fedora 34+, x64, 4 GB RAM', platform: 'linux' },
             ].map((req) => (
               <div
                 key={req.label}
-                className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm"
+                className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-sm"
               >
                 <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
                 <div>

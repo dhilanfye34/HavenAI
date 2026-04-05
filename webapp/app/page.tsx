@@ -54,11 +54,61 @@ const BENEFITS = [
 ];
 
 const AGENTS = [
-  { icon: FileSearch, name: 'File Monitor', desc: 'Watches file system changes, new downloads, and suspicious executables in real-time.', tags: ['File Integrity', 'Download Scanning'] },
-  { icon: Cpu, name: 'Process Monitor', desc: 'Tracks process spawns, parent-child chains, and detects resource anomalies.', tags: ['Spawn Detection', 'Chain Analysis'] },
-  { icon: Wifi, name: 'Network Monitor', desc: 'Monitors all connections, unusual ports, and potential data exfiltration attempts.', tags: ['Port Analysis', 'DNS Tracking'] },
-  { icon: Mail, name: 'Email Inbox', desc: 'Connects via IMAP and monitors for phishing attempts and suspicious patterns.', tags: ['Phishing Detection', 'Sender Analysis'] },
-  { icon: Bell, name: 'Alert Dispatch', desc: 'Routes critical alerts through email, SMS, and automated phone calls.', tags: ['Multi-Channel', 'Severity Routing'] },
+  {
+    icon: FileSearch,
+    name: 'File Monitor',
+    desc: 'Watches file system changes, new downloads, and suspicious executables in real-time.',
+    tags: ['File Integrity', 'Download Scanning'],
+    color: 'from-violet-500 to-purple-600',
+    glowColor: 'rgba(139, 92, 246, 0.15)',
+    iconBg: 'bg-violet-500/10',
+    iconColor: 'text-violet-400',
+    borderHover: 'hover:border-violet-500/20',
+  },
+  {
+    icon: Cpu,
+    name: 'Process Monitor',
+    desc: 'Tracks process spawns, parent-child chains, and detects resource anomalies.',
+    tags: ['Spawn Detection', 'Chain Analysis'],
+    color: 'from-cyan-500 to-blue-600',
+    glowColor: 'rgba(34, 211, 238, 0.15)',
+    iconBg: 'bg-cyan-500/10',
+    iconColor: 'text-cyan-400',
+    borderHover: 'hover:border-cyan-500/20',
+  },
+  {
+    icon: Wifi,
+    name: 'Network Monitor',
+    desc: 'Monitors all connections, unusual ports, and potential data exfiltration attempts.',
+    tags: ['Port Analysis', 'DNS Tracking'],
+    color: 'from-emerald-500 to-teal-600',
+    glowColor: 'rgba(52, 211, 153, 0.15)',
+    iconBg: 'bg-emerald-500/10',
+    iconColor: 'text-emerald-400',
+    borderHover: 'hover:border-emerald-500/20',
+  },
+  {
+    icon: Mail,
+    name: 'Email Inbox',
+    desc: 'Connects via IMAP and monitors for phishing attempts and suspicious patterns.',
+    tags: ['Phishing Detection', 'Sender Analysis'],
+    color: 'from-amber-500 to-orange-600',
+    glowColor: 'rgba(245, 158, 11, 0.15)',
+    iconBg: 'bg-amber-500/10',
+    iconColor: 'text-amber-400',
+    borderHover: 'hover:border-amber-500/20',
+  },
+  {
+    icon: Bell,
+    name: 'Alert Dispatch',
+    desc: 'Routes critical alerts through email, SMS, and automated phone calls.',
+    tags: ['Multi-Channel', 'Severity Routing'],
+    color: 'from-rose-500 to-pink-600',
+    glowColor: 'rgba(244, 63, 94, 0.15)',
+    iconBg: 'bg-rose-500/10',
+    iconColor: 'text-rose-400',
+    borderHover: 'hover:border-rose-500/20',
+  },
 ];
 
 const STATS = [
@@ -126,10 +176,10 @@ export default function Home() {
         <SmokeBackground className="opacity-50" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0a0f] via-transparent to-[#0a0a0f]" style={{ zIndex: 1 }} />
 
-      {/* ── Agents showcase (alternating layout) ─────────── */}
+      {/* ── Agents showcase ─────────────────────────────── */}
       <section className="relative py-28" style={{ zIndex: 2 }}>
         <div className="mx-auto max-w-6xl px-6">
-          <div className="mb-20 text-center">
+          <div className="mb-16 text-center">
             <div className="section-badge mb-6 justify-center">Our Agents</div>
             <h2 className="text-3xl font-bold tracking-tight md:text-5xl">
               Five AI Agents That Guard{' '}
@@ -137,47 +187,22 @@ export default function Home() {
               Every Surface
             </h2>
             <p className="mx-auto mt-5 max-w-2xl text-gray-500">
-              A coordinated multi-agent system that monitors your files, processes, 
+              A coordinated multi-agent system that monitors your files, processes,
               network, email, and alert channels — working together in real-time.
             </p>
           </div>
 
-          <div className="space-y-6">
-            {AGENTS.map(({ icon: Icon, name, desc, tags }, idx) => (
-              <div
-                key={name}
-                className={`grid items-center gap-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 md:grid-cols-[1fr_1.4fr] ${
-                  idx % 2 === 1 ? 'md:grid-cols-[1.4fr_1fr]' : ''
-                }`}
-              >
-                <div className={idx % 2 === 1 ? 'md:order-2' : ''}>
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/[0.08] text-violet-400">
-                    <Icon className="h-7 w-7" />
-                  </div>
-                  <h3 className="mb-3 text-2xl font-bold text-white">{name}</h3>
-                  <p className="mb-5 leading-relaxed text-gray-400">{desc}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3.5 py-1 text-xs font-medium text-gray-400"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className={`flex items-center justify-center ${idx % 2 === 1 ? 'md:order-1' : ''}`}>
-                  <div className="relative flex h-48 w-full items-center justify-center rounded-2xl border border-white/[0.04] bg-white/[0.01]">
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet-500/[0.04] to-cyan-500/[0.02]" />
-                    <Icon className="relative h-16 w-16 text-white/[0.08]" />
-                    <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#0a0a0f]/80 px-3 py-2 backdrop-blur-sm">
-                      <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]" />
-                      <span className="text-xs text-gray-400">Agent active — monitoring in real-time</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          {/* Top row: 3 cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {AGENTS.slice(0, 3).map((agent) => (
+              <AgentCard key={agent.name} agent={agent} />
+            ))}
+          </div>
+
+          {/* Bottom row: 2 cards centered */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-2 lg:mx-auto lg:max-w-[calc(66.666%+0.5rem)]">
+            {AGENTS.slice(3).map((agent) => (
+              <AgentCard key={agent.name} agent={agent} />
             ))}
           </div>
         </div>
@@ -243,6 +268,56 @@ export default function Home() {
       </div>{/* end smoke wrapper */}
 
       <Footer />
+    </div>
+  );
+}
+
+function AgentCard({ agent }: { agent: typeof AGENTS[number] }) {
+  const { icon: Icon, name, desc, tags, color, glowColor, iconBg, iconColor, borderHover } = agent;
+
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-all duration-300 ${borderHover} hover:bg-white/[0.04]`}
+    >
+      {/* Subtle gradient glow on hover */}
+      <div
+        className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
+        style={{ background: glowColor }}
+      />
+
+      {/* Icon with gradient ring */}
+      <div className="relative mb-5">
+        <div className={`inline-flex rounded-2xl ${iconBg} p-3.5`}>
+          <div className={`relative`}>
+            <Icon className={`h-6 w-6 ${iconColor}`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <h3 className="mb-2 text-lg font-semibold text-white">{name}</h3>
+      <p className="mb-5 text-sm leading-relaxed text-gray-400">{desc}</p>
+
+      {/* Tags */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {tags.map((tag) => (
+          <span
+            key={tag}
+            className="rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1 text-xs font-medium text-gray-500"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      {/* Status line */}
+      <div className="flex items-center gap-2 pt-3 border-t border-white/[0.04]">
+        <div className="relative flex h-2 w-2 items-center justify-center">
+          <div className="absolute h-2 w-2 rounded-full bg-emerald-400/40 animate-ping" />
+          <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
+        </div>
+        <span className="text-xs text-gray-500">Active</span>
+      </div>
     </div>
   );
 }

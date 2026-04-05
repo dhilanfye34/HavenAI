@@ -33,6 +33,37 @@ function authHeaders(token: string): HeadersInit {
   };
 }
 
+export interface DeviceInfo {
+  id: string;
+  name: string;
+  os_type: string;
+  os_version: string | null;
+  is_active: boolean;
+  is_online: boolean;
+  last_seen: string;
+  created_at: string;
+}
+
+export async function listDevices(token: string): Promise<DeviceInfo[]> {
+  const response = await fetch(`${API_URL}/devices`, {
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Failed to fetch devices.'));
+  }
+  return response.json();
+}
+
+export async function unlinkDevice(token: string, deviceId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/devices/${deviceId}/unlink`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Failed to unlink device.'));
+  }
+}
+
 export async function getProtectionStatus(token: string): Promise<ProtectionStatus> {
   const response = await fetch(`${API_URL}/devices/status`, {
     headers: authHeaders(token),

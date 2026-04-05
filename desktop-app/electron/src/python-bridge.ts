@@ -229,6 +229,12 @@ export class PythonBridge extends EventEmitter {
       case 'device_registered':
         this.emit('device-registered', data);
         break;
+      case 'device_linked_error':
+        this.emit('device-linked-error', message.message || 'This device is linked to another account.');
+        break;
+      case 'device_unlinked':
+        this.emit('device-unlinked', data);
+        break;
       case 'local-events':
         this.emit('local-events', data);
         break;
