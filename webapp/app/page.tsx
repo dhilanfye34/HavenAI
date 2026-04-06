@@ -55,6 +55,7 @@ const BENEFITS = [
 
 const AGENTS = [
   {
+    slug: 'file-monitor',
     icon: FileSearch,
     name: 'File Monitor',
     desc: 'Watches file system changes, new downloads, and suspicious executables in real-time.',
@@ -66,6 +67,7 @@ const AGENTS = [
     borderHover: 'hover:border-violet-500/20',
   },
   {
+    slug: 'process-monitor',
     icon: Cpu,
     name: 'Process Monitor',
     desc: 'Tracks process spawns, parent-child chains, and detects resource anomalies.',
@@ -77,6 +79,7 @@ const AGENTS = [
     borderHover: 'hover:border-cyan-500/20',
   },
   {
+    slug: 'network-monitor',
     icon: Wifi,
     name: 'Network Monitor',
     desc: 'Monitors all connections, unusual ports, and potential data exfiltration attempts.',
@@ -88,6 +91,7 @@ const AGENTS = [
     borderHover: 'hover:border-emerald-500/20',
   },
   {
+    slug: 'email-inbox',
     icon: Mail,
     name: 'Email Inbox',
     desc: 'Connects via IMAP and monitors for phishing attempts and suspicious patterns.',
@@ -99,6 +103,7 @@ const AGENTS = [
     borderHover: 'hover:border-amber-500/20',
   },
   {
+    slug: 'alert-dispatch',
     icon: Bell,
     name: 'Alert Dispatch',
     desc: 'Routes critical alerts through email, SMS, and automated phone calls.',
@@ -195,14 +200,18 @@ export default function Home() {
           {/* Top row: 3 cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {AGENTS.slice(0, 3).map((agent) => (
-              <AgentCard key={agent.name} agent={agent} />
+              <Link key={agent.name} href={`/features#${agent.slug}`}>
+                <AgentCard agent={agent} />
+              </Link>
             ))}
           </div>
 
           {/* Bottom row: 2 cards centered */}
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-2 lg:mx-auto lg:max-w-[calc(66.666%+0.5rem)]">
             {AGENTS.slice(3).map((agent) => (
-              <AgentCard key={agent.name} agent={agent} />
+              <Link key={agent.name} href={`/features#${agent.slug}`}>
+                <AgentCard agent={agent} />
+              </Link>
             ))}
           </div>
         </div>
