@@ -5,7 +5,6 @@ import {
   Wifi,
   Mail,
   Bell,
-  Shield,
   ArrowRight,
   Activity,
   Lock,
@@ -13,6 +12,7 @@ import {
   Zap,
   BarChart3,
 } from 'lucide-react';
+import ShieldLock from '../components/ShieldLock';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { DottedSurface } from '../components/DottedSurface';
@@ -61,7 +61,7 @@ const CORE_AGENTS = [
 ];
 
 const PLATFORM_FEATURES = [
-  { icon: Shield, label: 'AI Command Center', desc: 'Real-time dashboard with live triage, health scoring, and an AI security assistant.' },
+  { icon: ShieldLock, label: 'AI Command Center', desc: 'Real-time dashboard with live triage, health scoring, and an AI security assistant.' },
   { icon: Activity, label: 'Runtime Inspector', desc: 'Full live view of file, process, and network activity with filterable timeline.' },
   { icon: Lock, label: 'Privacy-First Design', desc: 'All monitoring runs locally. Your data never touches external servers.' },
   { icon: Eye, label: 'Behavioral Baseline', desc: 'Learns your patterns over time to reduce false positives and improve accuracy.' },
@@ -71,7 +71,8 @@ const PLATFORM_FEATURES = [
 
 export default function FeaturesPage() {
   return (
-    <div className="relative min-h-screen bg-[#0a0a0f] text-white">
+    <div className="relative min-h-screen text-white">
+      <div className="fixed inset-0 bg-[#0a0a0f]" style={{ zIndex: -1 }} />
       <DottedSurface className="opacity-40" />
       <div className="relative" style={{ zIndex: 1 }}>
       <Navbar />

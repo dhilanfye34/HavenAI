@@ -55,6 +55,18 @@ CREATE TABLE IF NOT EXISTS agent_snapshots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_snapshots_agent_ts ON agent_snapshots (agent_name, timestamp);
+
+CREATE TABLE IF NOT EXISTS user_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alert_id TEXT NOT NULL,
+    alert_type TEXT NOT NULL DEFAULT '',
+    pattern_key TEXT,
+    feedback TEXT NOT NULL,
+    processed INTEGER DEFAULT 0,
+    timestamp REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_processed ON user_feedback (processed, timestamp);
 """
 
 
@@ -213,6 +225,66 @@ class LocalDB:
         except Exception as e:
             logger.debug("insert_snapshot failed: %s", e)
 
+    def get_latest_snapshot(self, agent_name: str) -> Optional[Dict[str, Any]]:
+        """Return the most recent snapshot context for the given agent."""
+        try:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT context FROM agent_snapshots WHERE agent_name = ? ORDER BY timestamp DESC LIMIT 1",
+                    (agent_name,),
+                ).fetchone()
+            if row:
+                return json.loads(row["context"])
+        except Exception as e:
+            logger.debug("get_latest_snapshot failed: %s", e)
+        return None
+
+    # ------------------------------------------------------------------
+    # User feedback
+    # ------------------------------------------------------------------
+
+    def insert_feedback(
+        self, alert_id: str, feedback: str, alert_type: str = "", pattern_key: Optional[str] = None
+    ) -> None:
+        """Record user feedback on an alert."""
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    "INSERT INTO user_feedback (alert_id, alert_type, pattern_key, feedback, timestamp) VALUES (?, ?, ?, ?, ?)",
+                    (alert_id, alert_type, pattern_key, feedback, time.time()),
+                )
+        except Exception as e:
+            logger.debug("insert_feedback failed: %s", e)
+
+    def get_pending_feedback(self) -> List[Dict[str, Any]]:
+        """Return unprocessed feedback entries and mark them as processed."""
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT id, alert_id, alert_type, pattern_key, feedback, timestamp "
+                    "FROM user_feedback WHERE processed = 0 ORDER BY timestamp"
+                ).fetchall()
+                if rows:
+                    ids = [r["id"] for r in rows]
+                    placeholders = ",".join("?" for _ in ids)
+                    conn.execute(
+                        f"UPDATE user_feedback SET processed = 1 WHERE id IN ({placeholders})",
+                        ids,
+                    )
+                return [
+                    {
+                        "alert_id": r["alert_id"],
+                        "alert_type": r["alert_type"],
+                        "pattern_key": r["pattern_key"],
+                        "feedback": r["feedback"],
+                        "timestamp": r["timestamp"],
+                    }
+                    for r in rows
+                ]
+        except Exception as e:
+            logger.debug("get_pending_feedback failed: %s", e)
+            return []
+
     # ------------------------------------------------------------------
     # Maintenance
     # ------------------------------------------------------------------
@@ -227,6 +299,7 @@ class LocalDB:
                 conn.execute("DELETE FROM events")
                 conn.execute("DELETE FROM alerts")
                 conn.execute("DELETE FROM agent_snapshots")
+                conn.execute("DELETE FROM user_feedback")
             logger.info("LocalDB cleared all device-specific data")
         except Exception as e:
             logger.debug("clear failed: %s", e)

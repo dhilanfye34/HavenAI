@@ -12,9 +12,9 @@ import {
   HardDrive,
   Wifi,
   ArrowRight,
-  Shield,
   Sparkles,
 } from 'lucide-react';
+import ShieldLock from '../components/ShieldLock';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { ShaderHeroCanvas } from '../components/ShaderHeroCanvas';
@@ -243,7 +243,7 @@ export default function DownloadPage() {
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10">
             <div className="mb-2 flex justify-center">
               <div className="section-badge mb-4">
-                <Shield className="h-4 w-4" />
+                <ShieldLock className="h-4 w-4" />
                 Coverage
               </div>
             </div>

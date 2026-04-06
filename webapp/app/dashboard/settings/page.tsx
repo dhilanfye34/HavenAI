@@ -12,7 +12,6 @@ import {
   Moon,
   Phone,
   MessageSquare,
-  Shield,
   Sun,
   User,
   Wifi,
@@ -55,7 +54,7 @@ function SettingRow({
   description,
   children,
 }: {
-  icon: typeof Shield;
+  icon: typeof Bell;
   label: string;
   description?: string;
   children: React.ReactNode;

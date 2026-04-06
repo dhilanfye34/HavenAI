@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Shield } from 'lucide-react';
+import ShieldLock from './ShieldLock';
 
 const FOOTER_LINKS = [
   {
@@ -25,7 +25,7 @@ export function Footer() {
         <div className="grid gap-10 md:grid-cols-3">
           <div>
             <Link href="/" className="inline-flex items-center gap-2.5">
-              <Shield className="h-6 w-6 text-cyan-400" />
+              <ShieldLock className="h-6 w-6 text-cyan-400" />
               <span className="text-lg font-bold tracking-tight text-white">HavenAI</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-gray-500">

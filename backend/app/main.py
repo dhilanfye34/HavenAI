@@ -10,7 +10,7 @@ FastAPI application that handles:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, devices, alerts, health, downloads, chat, setup
+from app.routers import auth, devices, alerts, health, downloads, chat, setup, enrich
 from app.db.database import engine, Base
 from app.config import log_config_warnings
 
@@ -43,6 +43,7 @@ app.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
 app.include_router(downloads.router, prefix="/downloads", tags=["Downloads"])
 app.include_router(chat.router, prefix="/chat", tags=["Chat"])
 app.include_router(setup.router, prefix="/setup", tags=["Setup"])
+app.include_router(enrich.router, prefix="/enrich", tags=["Enrichment"])
 app.include_router(health.router, tags=["Health"])
 
 

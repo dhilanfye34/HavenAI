@@ -9,9 +9,9 @@ import {
   Lock,
   Mail,
   MessageCircle,
-  Shield,
   Unplug,
 } from 'lucide-react';
+import ShieldLock from '../../components/ShieldLock';
 import { useDashboard } from '../context/DashboardContext';
 
 interface ProviderInfo {
@@ -534,7 +534,7 @@ export default function EmailPage() {
 
       {!isDesktopRuntime && !isConnected && (
         <div className="card p-6 text-center">
-          <Shield className="mx-auto h-8 w-8 text-haven-text-tertiary" />
+          <ShieldLock className="mx-auto h-8 w-8 text-haven-text-tertiary" />
           <p className="mt-3 text-sm font-medium text-haven-text">Desktop app required</p>
           <p className="mt-1 text-xs text-haven-text-secondary">
             Email monitoring requires the HavenAI desktop app to scan your inbox locally and securely.

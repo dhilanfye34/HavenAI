@@ -9,9 +9,9 @@ import {
   Mail,
   MessageCircle,
   Settings,
-  Shield,
   Wifi,
 } from 'lucide-react';
+import ShieldLock from '../components/ShieldLock';
 import { DashboardProvider, useDashboard } from '../../../../../webapp/app/dashboard/context/DashboardContext';
 import { NavigationProvider } from '../../../../../webapp/app/dashboard/context/NavigationContext';
 
@@ -48,7 +48,7 @@ function ElectronSidebar({ tab, onTabChange }: { tab: Tab; onTabChange: (t: Tab)
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 lg:z-30 border-r bg-haven-surface" style={{ borderColor: 'var(--haven-border)' }}>
         <div className="flex h-16 items-center gap-2.5 px-6 drag-region">
-          <Shield className="h-7 w-7 text-blue-500 no-drag" />
+          <ShieldLock className="h-7 w-7 text-blue-500 no-drag" />
           <span className="text-lg font-bold tracking-tight text-haven-text no-drag">HavenAI</span>
         </div>
 

@@ -26,6 +26,7 @@ from .email_inbox_agent import EmailInboxAgent
 from .message_agent import MessageAgent
 from havenai.api import get_client
 from havenai.api.client import DeviceLinkedError
+from havenai.intelligence.baseline_builder import BaselineBuilder
 from havenai.storage.local_db import LocalDB
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,11 @@ class Coordinator:
         self.local_db.prune(event_days=7)
         self._last_prune = time.time()
         self._prune_interval = 86400
+
+        # Baseline builder — learns user behavior over time
+        self.baseline_builder = BaselineBuilder(self.shared_context, self.local_db)
+        self._last_baseline_update = 0.0
+        self._baseline_update_interval = 30.0  # seconds
     
     def initialize_agents(self) -> None:
         """Create all agent instances."""
@@ -169,6 +175,9 @@ class Coordinator:
             # Send heartbeat periodically
             self._maybe_send_heartbeat()
 
+            # Update behavioral baseline
+            self._maybe_update_baseline()
+
             # Prune old local data daily
             now = time.time()
             if now - self._last_prune >= self._prune_interval:
@@ -222,12 +231,48 @@ class Coordinator:
             except Exception as e:
                 logger.error(f"Failed to sync alert to cloud: {e}")
         
-        # Send to Electron UI
+        # Send to Electron UI (immediate, before enrichment)
         self._send_to_electron({
             "type": "alert",
             "data": alert
         })
+
+        # Async LLM enrichment for medium+ severity alerts
+        if (
+            self.sync_to_cloud
+            and self.api_client
+            and self.api_client.has_tokens()
+            and alert.get("severity", "low") in ("medium", "high", "critical")
+        ):
+            Thread(
+                target=self._enrich_alert_async,
+                args=(alert,),
+                daemon=True,
+            ).start()
     
+    def _enrich_alert_async(self, alert: Dict[str, Any]) -> None:
+        """Request LLM enrichment for an alert in a background thread.
+
+        When enrichment returns, send an ``alert_enriched`` message to Electron
+        so the UI can update the alert's description in-place.
+        """
+        try:
+            enrichment = self.api_client.enrich_alert(alert)
+            if enrichment:
+                self._send_to_electron({
+                    "type": "alert_enriched",
+                    "data": {
+                        "alert_id": alert.get("id") or alert.get("timestamp"),
+                        "alert_type": alert.get("type"),
+                        "explanation": enrichment.get("explanation"),
+                        "recommendation": enrichment.get("recommendation"),
+                        "confidence": enrichment.get("confidence"),
+                        "false_positive_likelihood": enrichment.get("false_positive_likelihood"),
+                    },
+                })
+        except Exception as e:
+            logger.debug(f"Alert enrichment failed (non-blocking): {e}")
+
     def _correlate_findings(self) -> List[Dict[str, Any]]:
         """
         Correlate findings across multiple agents.
@@ -336,6 +381,16 @@ class Coordinator:
         if now - self._last_preferences_sync >= self._preferences_sync_interval:
             self._fetch_and_apply_preferences(force=False, send_event=True)
             self._last_preferences_sync = now
+
+    def _maybe_update_baseline(self) -> None:
+        """Periodically update the behavioral baseline from agent observations."""
+        now = time.time()
+        if now - self._last_baseline_update >= self._baseline_update_interval:
+            try:
+                self.baseline_builder.update()
+            except Exception as e:
+                logger.debug(f"Baseline update failed: {e}")
+            self._last_baseline_update = now
 
     def _fetch_and_apply_preferences(self, force: bool, send_event: bool) -> None:
         """Fetch latest setup preferences and apply local monitor runtime changes."""
@@ -859,6 +914,24 @@ class Coordinator:
             self._send_to_electron({"type": "device_unlinked", "success": success})
             self._send_status()
 
+        elif msg_type == "alert_feedback":
+            data = message.get("data", {})
+            alert_id = data.get("alert_id", "")
+            feedback = data.get("feedback", "dismiss")
+            alert_type = data.get("alert_type", "")
+            pattern_key = data.get("pattern_key")
+            if alert_id and feedback:
+                self.local_db.insert_feedback(
+                    alert_id=alert_id,
+                    feedback=feedback,
+                    alert_type=alert_type,
+                    pattern_key=pattern_key,
+                )
+                self._send_to_electron({
+                    "type": "feedback_recorded",
+                    "data": {"alert_id": alert_id, "feedback": feedback},
+                })
+
         elif msg_type == "logout":
             # Stop device-bound monitors (file, process, network) but keep
             # email monitoring active — it's account-level, not device-level.
@@ -872,7 +945,7 @@ class Coordinator:
             self._auth_status["last_error"] = None
             self._local_preferences_override = False
             self._send_status()
-        
+
         else:
             logger.warning(f"Unknown message type from Electron: {msg_type}")
 

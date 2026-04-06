@@ -8,9 +8,9 @@ import {
   Eye,
   FileSearch,
   Mail,
-  Shield,
   Wifi,
 } from 'lucide-react';
+import ShieldLock from '../components/ShieldLock';
 
 const STEPS = [
   {
@@ -18,7 +18,7 @@ const STEPS = [
     headline: 'Welcome to HavenAI',
     description:
       'Your personal security guardian. We watch over your files, apps, and internet connections so you don\'t have to.',
-    visual: Shield,
+    visual: ShieldLock,
   },
   {
     id: 'features',
@@ -35,7 +35,7 @@ const STEPS = [
     headline: 'Your data stays private',
     description:
       'HavenAI runs entirely on your computer. Your files, emails, and activity are analyzed locally — nothing is sent to the cloud unless you choose to enable alerts.',
-    visual: Shield,
+    visual: ShieldLock,
   },
   {
     id: 'ready',

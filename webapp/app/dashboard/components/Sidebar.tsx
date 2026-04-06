@@ -10,9 +10,9 @@ import {
   Mail,
   MessageCircle,
   Settings,
-  Shield,
   Wifi,
 } from 'lucide-react';
+import ShieldLock from '../../components/ShieldLock';
 import { useDashboard } from '../context/DashboardContext';
 
 const NAV_ITEMS = [
@@ -46,7 +46,7 @@ export function Sidebar() {
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 lg:z-30 border-r bg-haven-surface" style={{ borderColor: 'var(--haven-border)' }}>
         <div className="flex h-16 items-center gap-2.5 px-6">
-          <Shield className="h-7 w-7 text-blue-500" />
+          <ShieldLock className="h-7 w-7 text-blue-500" />
           <span className="text-lg font-bold tracking-tight text-haven-text">HavenAI</span>
         </div>
 

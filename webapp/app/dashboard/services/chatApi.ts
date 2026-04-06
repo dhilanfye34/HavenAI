@@ -7,7 +7,9 @@ interface StreamChatParams {
   messages: Array<Pick<ChatMessage, 'role' | 'content'>>;
   contextEvents: ChatContextEvent[];
   model?: string;
+  conversationId?: string | null;
   onToken: (token: string) => void;
+  onDone?: (conversationId?: string) => void;
 }
 
 export async function streamChatCompletion({
@@ -15,7 +17,9 @@ export async function streamChatCompletion({
   messages,
   contextEvents,
   model = 'gpt-4o-mini',
+  conversationId,
   onToken,
+  onDone,
 }: StreamChatParams): Promise<void> {
   const response = await fetch(`${API_URL}/chat/stream`, {
     method: 'POST',
@@ -27,6 +31,7 @@ export async function streamChatCompletion({
       messages,
       context_events: contextEvents,
       model,
+      conversation_id: conversationId || null,
     }),
   });
 
@@ -56,10 +61,15 @@ export async function streamChatCompletion({
         type: 'token' | 'done' | 'error';
         content?: string;
         message?: string;
+        conversation_id?: string;
       };
 
       if (parsed.type === 'token' && parsed.content) {
         onToken(parsed.content);
+      }
+
+      if (parsed.type === 'done') {
+        onDone?.(parsed.conversation_id);
       }
 
       if (parsed.type === 'error') {
@@ -67,4 +77,23 @@ export async function streamChatCompletion({
       }
     }
   }
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listConversations(
+  token: string,
+  limit: number = 20,
+): Promise<ConversationSummary[]> {
+  const response = await fetch(`${API_URL}/chat/conversations?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.conversations ?? [];
 }

@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Shield, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import ShieldLock from './ShieldLock';
 
 const NAV_LINKS = [
   { href: '/', label: 'Home' },
@@ -20,7 +21,7 @@ export function Navbar() {
     <nav className="fixed top-0 z-50 w-full border-b border-white/[0.06] bg-[#0a0a0f]/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2.5">
-          <Shield className="h-7 w-7 text-cyan-400" />
+          <ShieldLock className="h-7 w-7 text-cyan-400" />
           <span className="text-xl font-bold tracking-tight text-white">HavenAI</span>
         </Link>
 

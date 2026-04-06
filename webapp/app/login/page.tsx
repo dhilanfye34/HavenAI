@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Shield, Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
+import ShieldLock from '../components/ShieldLock';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -60,7 +61,7 @@ export default function LoginPage() {
             Back to home
           </Link>
           <div className="mt-4 flex items-center justify-center gap-2.5">
-            <Shield className="h-9 w-9 text-blue-500" />
+            <ShieldLock className="h-9 w-9 text-blue-500" />
             <span className="text-2xl font-bold tracking-tight text-haven-text">HavenAI</span>
           </div>
         </div>

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Shield, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import ShieldLock from '../components/ShieldLock';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -85,7 +86,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-haven-bg px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Shield className="h-12 w-12 text-blue-500" />
+          <ShieldLock className="h-12 w-12 text-blue-500" />
           <span className="text-2xl font-bold tracking-tight text-haven-text">HavenAI</span>
           <p className="text-sm text-haven-text-tertiary">Connect your HavenAI account</p>
         </div>

@@ -247,6 +247,12 @@ export class PythonBridge extends EventEmitter {
       case 'email-config-result':
         this.emit('email-config-result', data);
         break;
+      case 'feedback_recorded':
+        this.emit('feedback-recorded', data);
+        break;
+      case 'alert_enriched':
+        this.emit('alert-enriched', data);
+        break;
       default:
         console.log('Unknown message type from Python:', type);
     }

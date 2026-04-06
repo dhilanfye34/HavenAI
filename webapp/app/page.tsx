@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import {
-  Shield,
   FileSearch,
   Cpu,
   Wifi,
@@ -15,6 +14,7 @@ import {
   BarChart3,
   Activity,
 } from 'lucide-react';
+import ShieldLock from './components/ShieldLock';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { ShaderBackground } from './components/ShaderBackground';
@@ -130,7 +130,7 @@ export default function Home() {
 
         <div className="relative mx-auto max-w-4xl px-6 text-center" style={{ zIndex: 2 }}>
           <div className="section-badge mb-8">
-            <Shield className="h-4 w-4" />
+            <ShieldLock className="h-4 w-4" />
             AI-Powered Cybersecurity
           </div>
 

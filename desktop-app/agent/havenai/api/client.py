@@ -380,6 +380,55 @@ class APIClient:
             logger.debug(f"Heartbeat failed: {e}")
             return False
     
+    def enrich_alert(self, alert: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Request LLM enrichment for an alert from the backend.
+
+        Returns enrichment data (explanation, recommendation, confidence,
+        false_positive_likelihood) or None if the request fails.
+        """
+        if not self.has_tokens():
+            return None
+
+        payload = {
+            "alert_type": alert.get("type", "unknown"),
+            "severity": alert.get("severity", "medium"),
+            "title": alert.get("title", ""),
+            "description": alert.get("description"),
+            "details": alert.get("details") if isinstance(alert.get("details"), dict) else None,
+            "risk_score": (
+                alert.get("details", {}).get("risk_score")
+                if isinstance(alert.get("details"), dict) else None
+            ),
+        }
+
+        try:
+            response = self.client.post(
+                f"{self.base_url}/enrich/alert",
+                headers=self._get_headers(),
+                json=payload,
+                timeout=15.0,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401 and self.refresh_access_token():
+                try:
+                    retry = self.client.post(
+                        f"{self.base_url}/enrich/alert",
+                        headers=self._get_headers(),
+                        json=payload,
+                        timeout=15.0,
+                    )
+                    retry.raise_for_status()
+                    return retry.json()
+                except Exception:
+                    pass
+            logger.debug(f"Alert enrichment failed: {e}")
+            return None
+        except Exception as e:
+            logger.debug(f"Alert enrichment failed: {e}")
+            return None
+
     def get_alerts(self, limit: int = 20) -> list:
         """Get recent alerts from backend."""
         if not self.is_authenticated():

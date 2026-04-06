@@ -1,160 +1,138 @@
-"use client"
+'use client';
 
-import { useRef, useEffect } from "react"
+import React, { useEffect, useRef } from 'react';
+import * as THREE from 'three';
 
-const VERTEX = `#version 300 es
-precision highp float;
-in vec2 position;
-uniform float time;
-uniform vec2 resolution;
-out float vAlpha;
+type DottedSurfaceProps = Omit<React.ComponentProps<'div'>, 'ref'>;
 
-void main() {
-  float ix = position.x;
-  float iy = position.y;
-
-  float x = (ix - 20.0) * 150.0;
-  float z = (iy - 30.0) * 150.0;
-  float y = sin((ix + time * 0.07) * 0.3) * 50.0
-          + sin((iy + time * 0.07) * 0.5) * 50.0;
-
-  // Simple perspective projection
-  float fov = 60.0;
-  float near = 1.0;
-  float aspect = resolution.x / resolution.y;
-  float f = 1.0 / tan(radians(fov) * 0.5);
-
-  // Camera at (0, 355, 1220) looking at origin
-  float cx = x;
-  float cy = y - 355.0;
-  float cz = z - 1220.0;
-
-  float clipX = f / aspect * cx / (-cz);
-  float clipY = f * cy / (-cz);
-
-  gl_Position = vec4(clipX, clipY, 0.0, 1.0);
-
-  // Size attenuation + fog
-  float dist = length(vec3(cx, cy, cz));
-  gl_PointSize = max(1.0, 800.0 / dist);
-
-  // Fog: fade from 2000 to 10000
-  float fog = 1.0 - smoothstep(2000.0, 10000.0, dist);
-  vAlpha = 0.6 * fog;
-}`
-
-const FRAGMENT = `#version 300 es
-precision highp float;
-in float vAlpha;
-out vec4 O;
-
-void main() {
-  // Round point
-  vec2 c = gl_PointCoord - 0.5;
-  if (dot(c, c) > 0.25) discard;
-  O = vec4(0.55, 0.36, 0.96, vAlpha);
-}`
-
-interface DottedSurfaceProps {
-  className?: string
-}
-
-export function DottedSurface({ className = "" }: DottedSurfaceProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const rafRef = useRef(0)
+export function DottedSurface({ className = '', ...props }: DottedSurfaceProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<{
+    scene: THREE.Scene;
+    camera: THREE.PerspectiveCamera;
+    renderer: THREE.WebGLRenderer;
+    animationId: number;
+  } | null>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
+    if (!containerRef.current) return;
 
-    const gl = canvas.getContext("webgl2", { alpha: true })
-    if (!gl) return
+    const SEPARATION = 150;
+    const AMOUNTX = 40;
+    const AMOUNTY = 60;
 
-    const dpr = Math.min(1.5, window.devicePixelRatio)
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x0a0a0f, 2000, 10000);
 
-    const compile = (type: number, src: string) => {
-      const s = gl.createShader(type)!
-      gl.shaderSource(s, src)
-      gl.compileShader(s)
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(s))
-      }
-      return s
-    }
+    const camera = new THREE.PerspectiveCamera(
+      60,
+      window.innerWidth / window.innerHeight,
+      1,
+      10000,
+    );
+    camera.position.set(0, 355, 1220);
 
-    const vs = compile(gl.VERTEX_SHADER, VERTEX)
-    const fs = compile(gl.FRAGMENT_SHADER, FRAGMENT)
+    const renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+    });
+    renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
 
-    const prog = gl.createProgram()!
-    gl.attachShader(prog, vs)
-    gl.attachShader(prog, fs)
-    gl.linkProgram(prog)
+    containerRef.current.appendChild(renderer.domElement);
 
-    // Generate grid of points
-    const AMOUNTX = 40
-    const AMOUNTY = 60
-    const positions = new Float32Array(AMOUNTX * AMOUNTY * 2)
-    let idx = 0
+    // Build particle grid
+    const positions: number[] = [];
+    const colors: number[] = [];
+
     for (let ix = 0; ix < AMOUNTX; ix++) {
       for (let iy = 0; iy < AMOUNTY; iy++) {
-        positions[idx++] = ix
-        positions[idx++] = iy
+        const x = ix * SEPARATION - (AMOUNTX * SEPARATION) / 2;
+        const z = iy * SEPARATION - (AMOUNTY * SEPARATION) / 2;
+        positions.push(x, 0, z);
+        // Soft purple-ish dots to match the site palette
+        colors.push(0.55, 0.36, 0.96);
       }
     }
 
-    const buf = gl.createBuffer()
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf)
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW)
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
-    const posLoc = gl.getAttribLocation(prog, "position")
-    gl.enableVertexAttribArray(posLoc)
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
+    const material = new THREE.PointsMaterial({
+      size: 8,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.6,
+      sizeAttenuation: true,
+    });
 
-    const uTime = gl.getUniformLocation(prog, "time")
-    const uRes = gl.getUniformLocation(prog, "resolution")
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
 
-    gl.enable(gl.BLEND)
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+    let count = 0;
+    let animationId = 0;
 
-    const resize = () => {
-      canvas.width = canvas.clientWidth * dpr
-      canvas.height = canvas.clientHeight * dpr
-      gl.viewport(0, 0, canvas.width, canvas.height)
-    }
+    const animate = () => {
+      animationId = requestAnimationFrame(animate);
 
-    resize()
-    window.addEventListener("resize", resize)
+      const posAttr = geometry.attributes.position;
+      const arr = posAttr.array as Float32Array;
 
-    let t = 0
-    const numPoints = AMOUNTX * AMOUNTY
+      let i = 0;
+      for (let ix = 0; ix < AMOUNTX; ix++) {
+        for (let iy = 0; iy < AMOUNTY; iy++) {
+          arr[i * 3 + 1] =
+            Math.sin((ix + count) * 0.3) * 50 +
+            Math.sin((iy + count) * 0.5) * 50;
+          i++;
+        }
+      }
 
-    const loop = () => {
-      t += 1
-      gl.clearColor(0, 0, 0, 0)
-      gl.clear(gl.COLOR_BUFFER_BIT)
-      gl.useProgram(prog)
-      gl.uniform1f(uTime, t)
-      gl.uniform2f(uRes, canvas.width, canvas.height)
-      gl.drawArrays(gl.POINTS, 0, numPoints)
-      rafRef.current = requestAnimationFrame(loop)
-    }
+      posAttr.needsUpdate = true;
+      renderer.render(scene, camera);
+      count += 0.07;
+    };
 
-    rafRef.current = requestAnimationFrame(loop)
+    const handleResize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+    animate();
+
+    sceneRef.current = { scene, camera, renderer, animationId };
 
     return () => {
-      cancelAnimationFrame(rafRef.current)
-      window.removeEventListener("resize", resize)
-      gl.deleteProgram(prog)
-      gl.deleteShader(vs)
-      gl.deleteShader(fs)
-      gl.deleteBuffer(buf)
-    }
-  }, [])
+      window.removeEventListener('resize', handleResize);
+      if (sceneRef.current) {
+        cancelAnimationFrame(sceneRef.current.animationId);
+        sceneRef.current.scene.traverse((object) => {
+          if (object instanceof THREE.Points) {
+            object.geometry.dispose();
+            if (Array.isArray(object.material)) {
+              object.material.forEach((m) => m.dispose());
+            } else {
+              object.material.dispose();
+            }
+          }
+        });
+        sceneRef.current.renderer.dispose();
+        if (containerRef.current && sceneRef.current.renderer.domElement) {
+          containerRef.current.removeChild(sceneRef.current.renderer.domElement);
+        }
+      }
+    };
+  }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className={`pointer-events-none fixed inset-0 h-full w-full ${className}`}
+    <div
+      ref={containerRef}
+      className={`pointer-events-none fixed inset-0 z-0 ${className}`}
+      {...props}
     />
-  )
+  );
 }

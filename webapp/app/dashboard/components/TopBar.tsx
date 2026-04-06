@@ -1,4 +1,5 @@
-import { Bell, Shield, UserCircle2, LogOut } from 'lucide-react';
+import { Bell, UserCircle2, LogOut } from 'lucide-react';
+import ShieldLock from '../../components/ShieldLock';
 
 interface TopBarProps {
   userLabel: string;
@@ -15,7 +16,7 @@ export function TopBar({
     <header className="border-b border-white/[0.06] bg-[#0a0a0f]/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-[1600px] items-center justify-between px-4 md:px-6">
         <div className="flex items-center gap-3">
-          <Shield className="h-6 w-6 text-cyan-400" />
+          <ShieldLock className="h-6 w-6 text-cyan-400" />
           <span className="text-lg font-semibold tracking-tight text-white">
             HavenAI <span className="text-gray-500 font-normal">Command Center</span>
           </span>

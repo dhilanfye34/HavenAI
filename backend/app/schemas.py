@@ -180,6 +180,7 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     context_events: List[ChatContextEvent] = []
     model: str = "gpt-4o-mini"
+    conversation_id: Optional[str] = None
 
 
 # ============== Setup Schemas ==============
@@ -240,3 +241,43 @@ class SetupPreferencesUpdate(BaseModel):
         if len(digits) < 7 or len(digits) > 15:
             raise ValueError("Phone number must contain between 7 and 15 digits.")
         return f"+{digits}" if has_plus else digits
+
+
+# ============== Enrichment Schemas ==============
+
+class EnrichmentRequest(BaseModel):
+    """Request payload for LLM-powered alert enrichment."""
+    alert_type: str
+    severity: str
+    title: str
+    description: Optional[str] = None
+    details: Optional[dict] = None
+    risk_score: Optional[float] = None
+    baseline_context: Optional[dict] = None
+
+
+class EnrichmentResponse(BaseModel):
+    """LLM-enriched alert interpretation."""
+    explanation: str
+    recommendation: str
+    confidence: float
+    false_positive_likelihood: float
+
+
+# ============== Conversation Schemas ==============
+
+class ConversationResponse(BaseModel):
+    """Schema for a conversation thread."""
+    id: str
+    title: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ConversationListResponse(BaseModel):
+    """Schema for listing conversations."""
+    conversations: List[ConversationResponse]
+    total: int
