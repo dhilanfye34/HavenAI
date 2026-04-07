@@ -16,19 +16,28 @@ import ShieldLock from '../../components/ShieldLock';
 import { useDashboard } from '../context/DashboardContext';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Home', icon: Home, badgeKey: null },
-  { href: '/dashboard/apps', label: 'Apps & Privacy', icon: Eye, badgeKey: null },
-  { href: '/dashboard/files', label: 'Files', icon: FileSearch, badgeKey: null },
-  { href: '/dashboard/network', label: 'Network', icon: Wifi, badgeKey: null },
-  { href: '/dashboard/email', label: 'Email', icon: Mail, badgeKey: null },
-  { href: '/dashboard/alerts', label: 'Alerts', icon: Bell, badgeKey: 'alerts' as const },
-  { href: '/dashboard/chat', label: 'Chat', icon: MessageCircle, badgeKey: null },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings, badgeKey: null },
+  { href: '/dashboard', label: 'Home', icon: Home, badgeKey: null, statusArea: null },
+  { href: '/dashboard/apps', label: 'Apps & Privacy', icon: Eye, badgeKey: null, statusArea: 'apps' },
+  { href: '/dashboard/files', label: 'Files', icon: FileSearch, badgeKey: null, statusArea: 'files' },
+  { href: '/dashboard/network', label: 'Network', icon: Wifi, badgeKey: null, statusArea: 'network' },
+  { href: '/dashboard/email', label: 'Email', icon: Mail, badgeKey: null, statusArea: 'email' },
+  { href: '/dashboard/alerts', label: 'Alerts', icon: Bell, badgeKey: 'alerts' as const, statusArea: null },
+  { href: '/dashboard/chat', label: 'Chat', icon: MessageCircle, badgeKey: null, statusArea: null },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings, badgeKey: null, statusArea: 'settings' },
 ];
+
+function statusDotColor(status: string | undefined): string | null {
+  if (status === 'protected') return 'bg-green-500';
+  if (status === 'concerns') return 'bg-amber-500';
+  if (status === 'off') return 'bg-gray-400 dark:bg-gray-600';
+  if (status === 'not-setup') return 'bg-red-500';
+  if (status === 'error') return 'bg-amber-500';
+  return null;
+}
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { alertCounts } = useDashboard();
+  const { alertCounts, protectionAreas, agents } = useDashboard();
   const urgentCount = alertCounts.critical + alertCounts.warning;
 
   const isActive = (href: string) => {
@@ -41,6 +50,16 @@ export function Sidebar() {
     return 0;
   };
 
+  const getStatusDot = (statusArea: string | null): string | null => {
+    if (!statusArea) return null;
+    if (statusArea === 'settings') {
+      const hasErrors = agents.some((a) => a.status === 'error');
+      return hasErrors ? 'bg-amber-500' : null;
+    }
+    const area = protectionAreas.find((a) => a.id === statusArea);
+    return area ? statusDotColor(area.status) : null;
+  };
+
   return (
     <>
       {/* Desktop sidebar */}
@@ -51,9 +70,10 @@ export function Sidebar() {
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {NAV_ITEMS.map(({ href, label, icon: Icon, badgeKey }) => {
+          {NAV_ITEMS.map(({ href, label, icon: Icon, badgeKey, statusArea }) => {
             const active = isActive(href);
             const badge = getBadge(badgeKey);
+            const dotColor = getStatusDot(statusArea);
             return (
               <Link
                 key={href}
@@ -66,6 +86,9 @@ export function Sidebar() {
               >
                 <Icon className="h-[18px] w-[18px]" />
                 <span className="flex-1">{label}</span>
+                {dotColor && (
+                  <span className={`h-2 w-2 rounded-full ${dotColor}`} />
+                )}
                 {badge > 0 && (
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
                     {badge}
@@ -79,19 +102,25 @@ export function Sidebar() {
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 inset-x-0 z-30 flex lg:hidden border-t bg-haven-surface" style={{ borderColor: 'var(--haven-border)' }}>
-        {NAV_ITEMS.filter((_, i) => i < 5).map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.filter((_, i) => i < 5).map(({ href, label, icon: Icon, statusArea }) => {
           const active = isActive(href);
+          const dotColor = getStatusDot(statusArea);
           return (
             <Link
               key={href}
               href={href}
-              className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-all ${
+              className={`relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-all ${
                 active
                   ? 'text-blue-600 dark:text-blue-400'
                   : 'text-haven-text-tertiary'
               }`}
             >
-              <Icon className="h-5 w-5" />
+              <div className="relative">
+                <Icon className="h-5 w-5" />
+                {dotColor && (
+                  <span className={`absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full ${dotColor}`} />
+                )}
+              </div>
               {label}
             </Link>
           );

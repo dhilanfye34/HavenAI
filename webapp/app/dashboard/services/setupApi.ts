@@ -33,6 +33,76 @@ function authHeaders(token: string): HeadersInit {
   };
 }
 
+// ── Token refresh logic ──
+
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) return null;
+
+  try {
+    const response = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    localStorage.setItem('access_token', data.access_token);
+    if (data.refresh_token) {
+      localStorage.setItem('refresh_token', data.refresh_token);
+    }
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
+
+// Deduplicate concurrent refresh attempts
+function getRefreshedToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+// Wrapper: make a fetch, if 401 try refreshing the token and retry once
+async function fetchWithAuth(
+  url: string,
+  token: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const response = await fetch(url, {
+    ...init,
+    headers: { ...authHeaders(token), ...(init?.headers || {}) },
+  });
+
+  if (response.status === 401) {
+    const newToken = await getRefreshedToken();
+    if (newToken) {
+      // Retry with new token
+      return fetch(url, {
+        ...init,
+        headers: { ...authHeaders(newToken), ...(init?.headers || {}) },
+      });
+    }
+    // Refresh failed — redirect to login
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  }
+
+  return response;
+}
+
+// ── API functions ──
+
 export interface DeviceInfo {
   id: string;
   name: string;
@@ -45,9 +115,7 @@ export interface DeviceInfo {
 }
 
 export async function listDevices(token: string): Promise<DeviceInfo[]> {
-  const response = await fetch(`${API_URL}/devices`, {
-    headers: authHeaders(token),
-  });
+  const response = await fetchWithAuth(`${API_URL}/devices`, token);
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, 'Failed to fetch devices.'));
   }
@@ -55,9 +123,8 @@ export async function listDevices(token: string): Promise<DeviceInfo[]> {
 }
 
 export async function unlinkDevice(token: string, deviceId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/devices/${deviceId}/unlink`, {
+  const response = await fetchWithAuth(`${API_URL}/devices/${deviceId}/unlink`, token, {
     method: 'POST',
-    headers: authHeaders(token),
   });
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, 'Failed to unlink device.'));
@@ -65,9 +132,7 @@ export async function unlinkDevice(token: string, deviceId: string): Promise<voi
 }
 
 export async function getProtectionStatus(token: string): Promise<ProtectionStatus> {
-  const response = await fetch(`${API_URL}/devices/status`, {
-    headers: authHeaders(token),
-  });
+  const response = await fetchWithAuth(`${API_URL}/devices/status`, token);
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, 'Failed to fetch device protection status.'));
   }
@@ -75,9 +140,7 @@ export async function getProtectionStatus(token: string): Promise<ProtectionStat
 }
 
 export async function getSetupPreferences(token: string): Promise<SetupPreferences> {
-  const response = await fetch(`${API_URL}/setup/preferences`, {
-    headers: authHeaders(token),
-  });
+  const response = await fetchWithAuth(`${API_URL}/setup/preferences`, token);
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, 'Failed to fetch setup preferences.'));
   }
@@ -88,9 +151,8 @@ export async function updateSetupPreferences(
   token: string,
   payload: SetupPreferencesUpdate,
 ): Promise<SetupPreferences> {
-  const response = await fetch(`${API_URL}/setup/preferences`, {
+  const response = await fetchWithAuth(`${API_URL}/setup/preferences`, token, {
     method: 'PUT',
-    headers: authHeaders(token),
     body: JSON.stringify(payload),
   });
   if (!response.ok) {

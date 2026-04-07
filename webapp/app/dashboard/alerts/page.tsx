@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Bell, CheckCircle2, Clock, Info, MessageCircle } from 'lucide-react';
+import { AlertTriangle, Bell, CheckCircle2, Clock, Info, MessageCircle, ShieldCheck } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 import { SecurityAlert } from '../types';
 
@@ -74,9 +74,11 @@ function deduplicateAlerts(alerts: SecurityAlert[]): SecurityAlert[] {
 function AlertCard({
   alert,
   onAskChat,
+  onResolve,
 }: {
   alert: SecurityAlert;
   onAskChat: (alert: SecurityAlert) => void;
+  onResolve?: (alert: SecurityAlert) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const config = severityConfig(alert.severity);
@@ -104,6 +106,15 @@ function AlertCard({
               >
                 <MessageCircle className="h-3.5 w-3.5" />
               </button>
+              {onResolve && (
+                <button
+                  onClick={() => onResolve(alert)}
+                  className="p-1 text-haven-text-tertiary transition hover:text-green-500"
+                  title="Mark as resolved"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                </button>
+              )}
               <span className="text-xs text-haven-text-tertiary">
                 {timeAgo(alert.timestamp)}
               </span>
@@ -124,30 +135,38 @@ function AlertCard({
 }
 
 export default function AlertsPage() {
-  const { alerts, chatSendMessage } = useDashboard();
+  const { alerts, chatSendMessage, safelist } = useDashboard();
 
   // Clean up alerts: remove noise, deduplicate
   const cleanAlerts = useMemo(() => {
     return deduplicateAlerts(alerts.filter(isUsefulAlert));
   }, [alerts]);
 
+  // Split into unresolved and resolved
+  const unresolvedAlerts = cleanAlerts.filter((a) => !safelist.isSafe('alerts', a.id));
+  const resolvedAlerts = cleanAlerts.filter((a) => safelist.isSafe('alerts', a.id));
+
   const now = Date.now();
   const DAY_MS = 86_400_000;
 
-  // Split into today (last 24h) and older
+  // Split unresolved into today (last 24h) and older
   const todayAlerts = useMemo(() => {
-    return cleanAlerts.filter((a) => now - new Date(a.timestamp).getTime() <= DAY_MS);
-  }, [cleanAlerts, now]);
+    return unresolvedAlerts.filter((a) => now - new Date(a.timestamp).getTime() <= DAY_MS);
+  }, [unresolvedAlerts, now]);
 
   const olderAlerts = useMemo(() => {
-    return cleanAlerts.filter((a) => now - new Date(a.timestamp).getTime() > DAY_MS);
-  }, [cleanAlerts, now]);
+    return unresolvedAlerts.filter((a) => now - new Date(a.timestamp).getTime() > DAY_MS);
+  }, [unresolvedAlerts, now]);
 
   const todayUrgent = todayAlerts.filter((a) => a.severity !== 'info');
   const todayInfo = todayAlerts.filter((a) => a.severity === 'info');
 
   const askAboutAlert = (alert: SecurityAlert) => {
     chatSendMessage(`Tell me about this alert: "${alert.description}". What does it mean and what should I do?`);
+  };
+
+  const resolveAlert = (alert: SecurityAlert) => {
+    safelist.markSafe('alerts', alert.id);
   };
 
   return (
@@ -168,7 +187,7 @@ export default function AlertsPage() {
           </h2>
           <div className="max-h-[20rem] overflow-y-auto space-y-2 pr-1">
             {todayUrgent.map((alert) => (
-              <AlertCard key={alert.id} alert={alert} onAskChat={askAboutAlert} />
+              <AlertCard key={alert.id} alert={alert} onAskChat={askAboutAlert} onResolve={resolveAlert} />
             ))}
           </div>
         </div>
@@ -183,7 +202,7 @@ export default function AlertsPage() {
           </h2>
           <div className="max-h-[20rem] overflow-y-auto space-y-2 pr-1">
             {todayInfo.map((alert) => (
-              <AlertCard key={alert.id} alert={alert} onAskChat={askAboutAlert} />
+              <AlertCard key={alert.id} alert={alert} onAskChat={askAboutAlert} onResolve={resolveAlert} />
             ))}
           </div>
         </div>
@@ -209,6 +228,21 @@ export default function AlertsPage() {
           </h2>
           <div className="max-h-[16rem] overflow-y-auto space-y-2 pr-1">
             {olderAlerts.map((alert) => (
+              <AlertCard key={alert.id} alert={alert} onAskChat={askAboutAlert} onResolve={resolveAlert} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Resolved alerts */}
+      {resolvedAlerts.length > 0 && (
+        <div>
+          <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-haven-text">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            Resolved ({resolvedAlerts.length})
+          </h2>
+          <div className="max-h-[16rem] overflow-y-auto space-y-2 pr-1 opacity-60">
+            {resolvedAlerts.map((alert) => (
               <AlertCard key={alert.id} alert={alert} onAskChat={askAboutAlert} />
             ))}
           </div>

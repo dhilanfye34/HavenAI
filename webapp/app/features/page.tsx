@@ -377,7 +377,10 @@ function ThreatRadialMap() {
     return (norm > 0 && norm < 180) ? 'right' : 'left';
   };
 
+  const activeThreat = active !== null ? THREATS[active] : null;
+
   return (
+    <>
     <div className="relative mx-auto w-full max-w-[820px] aspect-square">
       {/* SVG rings + lines */}
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100">
@@ -436,7 +439,16 @@ function ThreatRadialMap() {
             className="absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center cursor-pointer"
             style={{ left: `${p.x}%`, top: `${p.y}%` }}
             onMouseEnter={() => setActive(i)}
-            onMouseLeave={() => setActive(null)}
+            onMouseLeave={() => {
+              // Only clear on desktop; mobile uses tap-to-select
+              if (typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches) {
+                setActive(null);
+              }
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setActive(i);
+            }}
           >
             {/* Node + pulse wrapper */}
             <div className="relative" style={{ width: 56, height: 56 }}>
@@ -463,9 +475,9 @@ function ThreatRadialMap() {
               {name}
             </p>
 
-            {/* Tooltip — appears next to the node */}
+            {/* Tooltip — desktop only (hidden on mobile to avoid viewport overflow) */}
             {isActive && (
-              <div className={`absolute ${tooltipClasses} z-30 w-56 rounded-xl border border-white/[0.08] bg-[#111118]/95 backdrop-blur-sm px-4 py-3 pointer-events-none`}>
+              <div className={`absolute ${tooltipClasses} z-30 w-56 rounded-xl border border-white/[0.08] bg-[#111118]/95 backdrop-blur-sm px-4 py-3 pointer-events-none hidden lg:block`}>
                 <div className="flex items-center gap-2 mb-1.5">
                   <h4 className="text-sm font-semibold text-white">{name}</h4>
                   <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
@@ -489,5 +501,33 @@ function ThreatRadialMap() {
       })}
 
     </div>
+
+    {/* Detail panel — shown on mobile/tablet always; on desktop shows only when a node is active */}
+    <div className="mx-auto mt-6 w-full max-w-[640px] px-2 lg:hidden">
+      {activeThreat ? (
+        <div className="rounded-xl border border-white/[0.08] bg-[#111118]/95 px-5 py-4">
+          <div className="mb-2 flex items-center gap-2">
+            <activeThreat.icon className={`h-5 w-5 ${activeThreat.severity === 'critical' ? 'text-red-400' : 'text-amber-400'}`} />
+            <h4 className="text-base font-semibold text-white">{activeThreat.name}</h4>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+              activeThreat.severity === 'critical' ? 'bg-red-500/15 text-red-400' : 'bg-amber-500/15 text-amber-400'
+            }`}>
+              {activeThreat.severity}
+            </span>
+          </div>
+          <p className="text-sm leading-relaxed text-gray-400">{activeThreat.desc}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {activeThreat.agents.map((a) => (
+              <span key={a} className="rounded-full border border-white/[0.06] bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-gray-500">
+                {a}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="text-center text-xs text-gray-600">Tap a threat to see details</p>
+      )}
+    </div>
+    </>
   );
 }

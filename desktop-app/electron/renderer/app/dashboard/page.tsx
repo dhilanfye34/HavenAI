@@ -28,20 +28,38 @@ import { FloatingAssistant } from '../../../../../webapp/app/dashboard/component
 
 type Tab = 'home' | 'apps' | 'files' | 'network' | 'email' | 'alerts' | 'chat' | 'settings';
 
-const NAV_ITEMS: { id: Tab; label: string; icon: typeof Home }[] = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'apps', label: 'Apps & Privacy', icon: Eye },
-  { id: 'files', label: 'Files', icon: FileSearch },
-  { id: 'network', label: 'Network', icon: Wifi },
-  { id: 'email', label: 'Email', icon: Mail },
-  { id: 'alerts', label: 'Alerts', icon: Bell },
-  { id: 'chat', label: 'Chat', icon: MessageCircle },
-  { id: 'settings', label: 'Settings', icon: Settings },
+const NAV_ITEMS: { id: Tab; label: string; icon: typeof Home; statusArea: string | null }[] = [
+  { id: 'home', label: 'Home', icon: Home, statusArea: null },
+  { id: 'apps', label: 'Apps & Privacy', icon: Eye, statusArea: 'apps' },
+  { id: 'files', label: 'Files', icon: FileSearch, statusArea: 'files' },
+  { id: 'network', label: 'Network', icon: Wifi, statusArea: 'network' },
+  { id: 'email', label: 'Email', icon: Mail, statusArea: 'email' },
+  { id: 'alerts', label: 'Alerts', icon: Bell, statusArea: null },
+  { id: 'chat', label: 'Chat', icon: MessageCircle, statusArea: null },
+  { id: 'settings', label: 'Settings', icon: Settings, statusArea: 'settings' },
 ];
 
+function statusDotColor(status: string | undefined): string | null {
+  if (status === 'protected') return 'bg-green-500';
+  if (status === 'concerns') return 'bg-amber-500';
+  if (status === 'off') return 'bg-gray-400 dark:bg-gray-600';
+  if (status === 'not-setup') return 'bg-red-500';
+  if (status === 'error') return 'bg-amber-500';
+  return null;
+}
+
 function ElectronSidebar({ tab, onTabChange }: { tab: Tab; onTabChange: (t: Tab) => void }) {
-  const { alertCounts } = useDashboard();
+  const { alertCounts, protectionAreas, agents } = useDashboard();
   const urgentCount = alertCounts.critical + alertCounts.warning;
+
+  const getStatusDot = (statusArea: string | null): string | null => {
+    if (!statusArea) return null;
+    if (statusArea === 'settings') {
+      return agents.some((a) => a.status === 'error') ? 'bg-amber-500' : null;
+    }
+    const area = protectionAreas.find((a) => a.id === statusArea);
+    return area ? statusDotColor(area.status) : null;
+  };
 
   return (
     <>
@@ -53,44 +71,58 @@ function ElectronSidebar({ tab, onTabChange }: { tab: Tab; onTabChange: (t: Tab)
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => onTabChange(id)}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                tab === id
-                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                  : 'text-haven-text-secondary hover:bg-haven-surface-hover hover:text-haven-text'
-              }`}
-            >
-              <Icon className="h-[18px] w-[18px]" />
-              <span className="flex-1 text-left">{label}</span>
-              {id === 'alerts' && urgentCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
-                  {urgentCount}
-                </span>
-              )}
-            </button>
-          ))}
+          {NAV_ITEMS.map(({ id, label, icon: Icon, statusArea }) => {
+            const dotColor = getStatusDot(statusArea);
+            return (
+              <button
+                key={id}
+                onClick={() => onTabChange(id)}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                  tab === id
+                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                    : 'text-haven-text-secondary hover:bg-haven-surface-hover hover:text-haven-text'
+                }`}
+              >
+                <Icon className="h-[18px] w-[18px]" />
+                <span className="flex-1 text-left">{label}</span>
+                {dotColor && (
+                  <span className={`h-2 w-2 rounded-full ${dotColor}`} />
+                )}
+                {id === 'alerts' && urgentCount > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                    {urgentCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
       </aside>
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 inset-x-0 z-30 flex lg:hidden border-t bg-haven-surface" style={{ borderColor: 'var(--haven-border)' }}>
-        {NAV_ITEMS.filter((_, i) => i < 5).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => onTabChange(id)}
-            className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-all ${
-              tab === id
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-haven-text-tertiary'
-            }`}
-          >
-            <Icon className="h-5 w-5" />
-            {label}
-          </button>
-        ))}
+        {NAV_ITEMS.filter((_, i) => i < 5).map(({ id, label, icon: Icon, statusArea }) => {
+          const dotColor = getStatusDot(statusArea);
+          return (
+            <button
+              key={id}
+              onClick={() => onTabChange(id)}
+              className={`relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-all ${
+                tab === id
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-haven-text-tertiary'
+              }`}
+            >
+              <div className="relative">
+                <Icon className="h-5 w-5" />
+                {dotColor && (
+                  <span className={`absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full ${dotColor}`} />
+                )}
+              </div>
+              {label}
+            </button>
+          );
+        })}
         <button
           onClick={() => onTabChange('alerts')}
           className={`relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-all ${

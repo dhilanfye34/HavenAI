@@ -94,14 +94,17 @@ class APIClient:
         user_id: Optional[str] = None,
         device_id: Optional[str] = None,
     ) -> None:
-        """Hydrate client auth/session data from desktop app state."""
+        """Hydrate client auth/session data from desktop app state.
+
+        device_id is always updated (including to None) so the Electron
+        store remains the single source of truth for device linkage.
+        """
         self.access_token = access_token
+        self.device_id = device_id
         if refresh_token is not None:
             self.refresh_token = refresh_token
         if user_id is not None:
             self.user_id = user_id
-        if device_id is not None:
-            self.device_id = device_id
         self._save_config()
 
     def clear_session(self) -> None:

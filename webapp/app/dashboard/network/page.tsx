@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { AlertTriangle, CheckCircle2, Globe, MessageCircle, Wifi } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Globe, MessageCircle, ShieldCheck, Wifi } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 
 interface ConnectionInfo {
@@ -185,7 +185,7 @@ function isKnownService(hostname?: string, ip?: string): boolean {
 }
 
 export default function NetworkPage() {
-  const { runtimeStatus, preferences, alerts, chatSendMessage } = useDashboard();
+  const { runtimeStatus, preferences, alerts, chatSendMessage, safelist } = useDashboard();
   const networkEnabled = Boolean(preferences?.network_monitoring_enabled);
   const details = runtimeStatus?.module_details;
   const metrics = runtimeStatus?.metrics;
@@ -233,8 +233,9 @@ export default function NetworkPage() {
     });
   }, [details]);
 
-  const flagged = connections.filter((c) => c.status === 'unknown');
-  const safe = connections.filter((c) => c.status === 'safe');
+  const flagged = connections.filter((c) => c.status === 'unknown' && !safelist.isSafe('hosts', c.destination));
+  const verified = connections.filter((c) => c.status === 'unknown' && safelist.isSafe('hosts', c.destination));
+  const safe = [...verified, ...connections.filter((c) => c.status === 'safe')];
   const totalConnections = metrics?.network_connection_count || connections.length;
 
   const askAboutConnection = (app: string, destination: string) => {
@@ -315,13 +316,22 @@ export default function NetworkPage() {
                       {conn.destination}
                     </p>
                   </div>
-                  <button
-                    onClick={() => askAboutConnection(conn.app, conn.destination)}
-                    className="shrink-0 p-1.5 text-haven-text-tertiary transition hover:text-blue-500"
-                    title="Ask about this connection"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => askAboutConnection(conn.app, conn.destination)}
+                      className="p-1.5 text-haven-text-tertiary transition hover:text-blue-500"
+                      title="Ask about this connection"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => safelist.markSafe('hosts', conn.destination)}
+                      className="p-1.5 text-haven-text-tertiary transition hover:text-green-500"
+                      title="Mark as safe"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -346,6 +356,9 @@ export default function NetworkPage() {
                       <span className="ml-1.5 text-xs text-haven-text-tertiary">
                         ({conn.count})
                       </span>
+                    )}
+                    {safelist.isSafe('hosts', conn.destination) && (
+                      <span className="ml-1.5 text-xs text-green-600 dark:text-green-400">(verified by you)</span>
                     )}
                   </p>
                   <p className="text-xs text-haven-text-tertiary truncate">

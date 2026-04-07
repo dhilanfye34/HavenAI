@@ -200,7 +200,7 @@ export default function Home() {
           {/* Top row: 3 cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {AGENTS.slice(0, 3).map((agent) => (
-              <Link key={agent.name} href={`/features#${agent.slug}`}>
+              <Link key={agent.name} href={`/features#${agent.slug}`} className="block">
                 <AgentCard agent={agent} />
               </Link>
             ))}
@@ -209,7 +209,7 @@ export default function Home() {
           {/* Bottom row: 2 cards centered */}
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-2 lg:mx-auto lg:max-w-[calc(66.666%+0.5rem)]">
             {AGENTS.slice(3).map((agent) => (
-              <Link key={agent.name} href={`/features#${agent.slug}`}>
+              <Link key={agent.name} href={`/features#${agent.slug}`} className="block">
                 <AgentCard agent={agent} />
               </Link>
             ))}
@@ -286,15 +286,9 @@ function AgentCard({ agent }: { agent: typeof AGENTS[number] }) {
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-all duration-300 ${borderHover} hover:bg-white/[0.04]`}
+      className={`group relative h-full rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-colors duration-300 ${borderHover} hover:bg-white/[0.04]`}
     >
-      {/* Subtle gradient glow on hover */}
-      <div
-        className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
-        style={{ background: glowColor }}
-      />
-
-      {/* Icon with gradient ring */}
+      {/* Icon */}
       <div className="relative mb-5">
         <div className={`inline-flex rounded-2xl ${iconBg} p-3.5`}>
           <div className={`relative`}>

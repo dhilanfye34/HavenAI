@@ -65,7 +65,12 @@ export function ShaderBackground({ className = "" }: ShaderBackgroundProps) {
     const gl = canvas.getContext("webgl2")
     if (!gl) return
 
-    const dpr = Math.min(1.5, window.devicePixelRatio)
+    // Lower DPR on mobile for big perf win
+    const isMobile = window.matchMedia("(max-width: 768px)").matches
+    const dpr = isMobile ? 1 : Math.min(1.5, window.devicePixelRatio)
+
+    // Respect reduced motion preference
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
     const compile = (type: number, src: string) => {
       const s = gl.createShader(type)!
@@ -109,22 +114,40 @@ export function ShaderBackground({ className = "" }: ShaderBackgroundProps) {
     resize()
     window.addEventListener("resize", resize)
 
+    // Pause rendering when the canvas is off-screen
+    let visible = true
+    const io = new IntersectionObserver(
+      ([entry]) => { visible = entry.isIntersecting },
+      { threshold: 0 }
+    )
+    io.observe(canvas)
+
+    // Throttle to ~30fps
+    const targetInterval = 1000 / 30
+    let lastTime = 0
     let t = 1.0
-    const loop = () => {
-      t += 0.06
+
+    const loop = (now: number) => {
+      rafRef.current = requestAnimationFrame(loop)
+      if (!visible) return
+      const delta = now - lastTime
+      if (delta < targetInterval) return
+      lastTime = now - (delta % targetInterval)
+
+      t += prefersReducedMotion ? 0 : 0.12
       gl.clearColor(0, 0, 0, 1)
       gl.clear(gl.COLOR_BUFFER_BIT)
       gl.useProgram(prog)
       gl.uniform2f(uRes, canvas.width, canvas.height)
       gl.uniform1f(uTime, t)
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-      rafRef.current = requestAnimationFrame(loop)
     }
 
     rafRef.current = requestAnimationFrame(loop)
 
     return () => {
       cancelAnimationFrame(rafRef.current)
+      io.disconnect()
       window.removeEventListener("resize", resize)
       gl.deleteProgram(prog)
       gl.deleteShader(vs)

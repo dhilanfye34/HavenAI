@@ -9,7 +9,7 @@ import {
   Clock,
   Eye,
   MessageCircle,
-  X,
+  ShieldCheck,
   XCircle,
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
@@ -89,11 +89,13 @@ const FLAGGED_RETENTION_MS = 60 * 1000;
 function AppCard({
   app,
   onAddToChat,
-  onDismiss,
+  onMarkSafe,
+  isSafelisted,
 }: {
   app: AppInfo;
   onAddToChat: (app: AppInfo) => void;
-  onDismiss?: (app: AppInfo) => void;
+  onMarkSafe?: (app: AppInfo) => void;
+  isSafelisted?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -135,6 +137,9 @@ function AppCard({
                   ({app.count} processes)
                 </span>
               )}
+              {isSafelisted && (
+                <span className="ml-1.5 text-xs text-green-600 dark:text-green-400">(verified by you)</span>
+              )}
             </p>
             <p className="text-xs text-haven-text-tertiary">{app.reason}</p>
             {!app.stillRunning && (
@@ -153,13 +158,13 @@ function AppCard({
           >
             <MessageCircle className="h-4 w-4" />
           </button>
-          {onDismiss && (
+          {onMarkSafe && (
             <button
-              onClick={() => onDismiss(app)}
-              className="p-1.5 text-haven-text-tertiary transition hover:text-red-500"
-              title="Dismiss"
+              onClick={() => onMarkSafe(app)}
+              className="p-1.5 text-haven-text-tertiary transition hover:text-green-500"
+              title="Mark as safe"
             >
-              <X className="h-4 w-4" />
+              <ShieldCheck className="h-4 w-4" />
             </button>
           )}
           {app.details.length > 0 && (
@@ -184,13 +189,12 @@ function AppCard({
 }
 
 export default function AppsPage() {
-  const { runtimeStatus, preferences, chatSendMessage } = useDashboard();
+  const { runtimeStatus, preferences, chatSendMessage, safelist } = useDashboard();
   const processEnabled = Boolean(preferences?.process_monitoring_enabled);
   const details = runtimeStatus?.module_details;
 
   // Persistent map of flagged processes — survives across re-renders and data refreshes
   const flaggedHistoryRef = useRef<Map<string, AppInfo>>(new Map());
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [, forceUpdate] = useState(0);
 
   // Build current snapshot from live data
@@ -300,31 +304,36 @@ export default function AppsPage() {
     forceUpdate((n) => n + 1);
   }, [currentApps]);
 
-  // Build final lists
+  // Build final lists — safelisted apps move to normal
   const flagged = useMemo(() => {
     return Array.from(flaggedHistoryRef.current.values())
-      .filter((a) => !dismissedIds.has(a.id))
-      .sort((a, b) => {
-        // Sort by firstSeen (oldest first) for stable ordering — new items append at bottom
-        return a.firstSeen - b.firstSeen;
-      });
-  }, [currentApps, dismissedIds]); // eslint-disable-line react-hooks/exhaustive-deps
+      .filter((a) => !safelist.isSafe('processes', a.name))
+      .sort((a, b) => a.firstSeen - b.firstSeen);
+  }, [currentApps, safelist]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Safelisted apps that were previously flagged
+  const verifiedApps = useMemo(() => {
+    return currentApps.filter(
+      (a) => a.category !== 'normal' && safelist.isSafe('processes', a.name),
+    );
+  }, [currentApps, safelist]);
 
   const normal = useMemo(() => {
-    return currentApps
-      .filter((a) => a.category === 'normal')
-      .sort((a, b) => b.totalCpu - a.totalCpu);
-  }, [currentApps]);
+    return [
+      ...verifiedApps.map((a) => ({ ...a, category: 'normal' as const, reason: 'Verified by you' })),
+      ...currentApps.filter((a) => a.category === 'normal'),
+    ].sort((a, b) => b.totalCpu - a.totalCpu);
+  }, [currentApps, verifiedApps]);
 
   const handleAddToChat = (app: AppInfo) => {
     const status = app.stillRunning ? 'currently running' : 'recently ran';
     chatSendMessage(`Tell me about the app "${app.name}" that is ${status} on my device. Is it safe? What does it do?`);
   };
 
-  const handleDismiss = useCallback((app: AppInfo) => {
-    setDismissedIds((prev) => new Set(prev).add(app.id));
+  const handleMarkSafe = useCallback((app: AppInfo) => {
+    safelist.markSafe('processes', app.name);
     flaggedHistoryRef.current.delete(app.id);
-  }, []);
+  }, [safelist]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -371,7 +380,7 @@ export default function AppsPage() {
                 key={app.id}
                 app={app}
                 onAddToChat={handleAddToChat}
-                onDismiss={handleDismiss}
+                onMarkSafe={handleMarkSafe}
               />
             ))}
           </div>
@@ -387,7 +396,12 @@ export default function AppsPage() {
         {normal.length > 0 ? (
           <div className="max-h-[24rem] overflow-y-auto space-y-2 pr-1">
             {normal.map((app) => (
-              <AppCard key={app.id} app={app} onAddToChat={handleAddToChat} />
+              <AppCard
+                key={app.id}
+                app={app}
+                onAddToChat={handleAddToChat}
+                isSafelisted={safelist.isSafe('processes', app.name)}
+              />
             ))}
           </div>
         ) : (

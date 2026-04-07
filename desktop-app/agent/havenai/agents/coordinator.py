@@ -599,6 +599,7 @@ class Coordinator:
         file_ctx = self.shared_context.get("FileAgent", {})
         process_ctx = self.shared_context.get("ProcessAgent", {})
         network_ctx = self.shared_context.get("NetworkAgent", {})
+        email_ctx = self.shared_context.get("EmailInboxAgent", {})
         file_running = "FileAgent" in self.monitor_agents
         process_running = "ProcessAgent" in self.monitor_agents
         network_running = "NetworkAgent" in self.monitor_agents
@@ -654,6 +655,12 @@ class Coordinator:
                 "active_connections": list(network_ctx.get("active_connections", []) or [])[:50]
                 if network_running
                 else [],
+            },
+            "email": {
+                "enabled": bool(email_ctx.get("enabled", False)),
+                "last_scan_count": int(email_ctx.get("last_scan_count", 0) or 0),
+                "findings": list(email_ctx.get("findings", []) or [])[-10:],
+                "total_scanned": int(email_ctx.get("total_scanned", 0) or 0),
             },
         }
 

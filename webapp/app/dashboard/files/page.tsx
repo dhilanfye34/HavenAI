@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { CheckCircle2, FileSearch, FileWarning, MessageCircle } from 'lucide-react';
+import { CheckCircle2, FileSearch, FileWarning, MessageCircle, ShieldCheck } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 
 function timeAgo(timestamp?: number): string {
@@ -27,7 +27,7 @@ function friendlyEventType(type?: string): string {
 }
 
 export default function FilesPage() {
-  const { runtimeStatus, preferences, alerts, chatSendMessage } = useDashboard();
+  const { runtimeStatus, preferences, alerts, chatSendMessage, safelist } = useDashboard();
   const fileEnabled = Boolean(preferences?.file_monitoring_enabled);
   const details = runtimeStatus?.module_details;
   const metrics = runtimeStatus?.metrics;
@@ -39,9 +39,11 @@ export default function FilesPage() {
       .slice(0, 20);
   }, [details]);
 
-  const fileAlerts = alerts.filter(
+  const allFileAlerts = alerts.filter(
     (a) => a.source.toLowerCase().includes('file') && a.severity !== 'info',
   );
+  const fileAlerts = allFileAlerts.filter((a) => !safelist.isSafe('files', a.id));
+  const reviewedFileAlerts = allFileAlerts.filter((a) => safelist.isSafe('files', a.id));
   const eventCount = metrics?.file_events_seen || details?.file.event_count || 0;
 
   const askAboutFile = (filename: string, eventType: string) => {
@@ -101,13 +103,49 @@ export default function FilesPage() {
                       {new Date(alert.timestamp).toLocaleString()}
                     </p>
                   </div>
-                  <button
-                    onClick={() => askAboutAlert(alert.description)}
-                    className="shrink-0 p-1.5 text-haven-text-tertiary transition hover:text-blue-500"
-                    title="Ask about this alert"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => askAboutAlert(alert.description)}
+                      className="p-1.5 text-haven-text-tertiary transition hover:text-blue-500"
+                      title="Ask about this alert"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => safelist.markSafe('files', alert.id)}
+                      className="p-1.5 text-haven-text-tertiary transition hover:text-green-500"
+                      title="Mark as reviewed"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reviewed */}
+      {reviewedFileAlerts.length > 0 && (
+        <div>
+          <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-haven-text">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            Reviewed ({reviewedFileAlerts.length})
+          </h2>
+          <div className="space-y-2 opacity-60">
+            {reviewedFileAlerts.map((alert) => (
+              <div key={alert.id} className="card p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-haven-text">
+                      {alert.description}
+                      <span className="ml-1.5 text-xs text-green-600 dark:text-green-400">(reviewed)</span>
+                    </p>
+                    <p className="mt-1 text-xs text-haven-text-tertiary">
+                      {new Date(alert.timestamp).toLocaleString()}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}

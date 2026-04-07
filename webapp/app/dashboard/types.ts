@@ -97,6 +97,22 @@ export interface AgentRuntimeStatus {
         status?: string;
       }>;
     };
+    email?: {
+      enabled: boolean;
+      last_scan_count: number;
+      total_scanned: number;
+      findings: Array<{
+        email?: {
+          from_name?: string;
+          from_email?: string;
+          subject?: string;
+          received_at?: string;
+        };
+        risk_score?: number;
+        reasons?: string[];
+        recommendation?: string;
+      }>;
+    };
   } | null;
   permission_hints: {
     platform: string;
@@ -129,6 +145,12 @@ export interface Recommendation {
   id: string;
   title: string;
   context: string;
+  severity: 'critical' | 'warning' | 'info';
+  description: string;
+  recommendation: string;
+  relatedAlerts: SecurityAlert[];
+  targetPath: string;
+  actionLabel: string;
 }
 
 export interface SecurityStats {

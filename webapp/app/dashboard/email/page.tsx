@@ -9,6 +9,7 @@ import {
   Lock,
   Mail,
   MessageCircle,
+  ShieldCheck,
   Unplug,
 } from 'lucide-react';
 import ShieldLock from '../../components/ShieldLock';
@@ -164,7 +165,7 @@ function timeAgo(timestamp: string): string {
 
 export default function EmailPage() {
   const {
-    preferences, isDesktopRuntime, alerts, chatSendMessage,
+    preferences, isDesktopRuntime, alerts, chatSendMessage, safelist,
     emailConnection, setEmailConnected, setEmailDisconnected, setEmailTesting, setEmailError,
   } = useDashboard();
 
@@ -184,20 +185,22 @@ export default function EmailPage() {
   const provider = detectProvider(emailAddress);
 
   // Deduplicate email alerts by subject+timestamp (agent can re-send same alert)
-  const emailAlerts = useMemo(() => {
+  const allEmailAlerts = useMemo(() => {
     const raw = alerts.filter(
       (a) => (a.source.toLowerCase().includes('email') || a.description.toLowerCase().includes('email'))
         && a.severity !== 'info',
     );
     const seen = new Set<string>();
     return raw.filter((a) => {
-      // Dedupe by description (which includes subject)
       const key = a.description;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
   }, [alerts]);
+
+  const emailAlerts = allEmailAlerts.filter((a) => !safelist.isSafe('emails', a.id));
+  const reviewedEmails = allEmailAlerts.filter((a) => safelist.isSafe('emails', a.id));
 
   const handleConnect = () => {
     const havenai = (window as any).havenai;
@@ -350,13 +353,22 @@ export default function EmailPage() {
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => askAboutAlert(alert)}
-                      className="shrink-0 p-1.5 text-haven-text-tertiary transition hover:text-blue-500"
-                      title="Ask about this email"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </button>
+                    <div className="flex flex-col items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => askAboutAlert(alert)}
+                        className="p-1.5 text-haven-text-tertiary transition hover:text-blue-500"
+                        title="Ask about this email"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => safelist.markSafe('emails', alert.id)}
+                        className="p-1.5 text-haven-text-tertiary transition hover:text-green-500"
+                        title="Not suspicious"
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -365,8 +377,33 @@ export default function EmailPage() {
         </div>
       )}
 
+      {/* Reviewed emails */}
+      {reviewedEmails.length > 0 && (
+        <div>
+          <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-haven-text">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            Reviewed ({reviewedEmails.length})
+          </h2>
+          <div className="max-h-[16rem] overflow-y-auto space-y-2 pr-1 opacity-60">
+            {reviewedEmails.map((alert) => {
+              const details = typeof alert.details === 'string' ? null : (alert.details as any);
+              const subject = details?.subject || alert.description.replace('Suspicious email: ', '');
+              return (
+                <div key={alert.id} className="card p-4">
+                  <p className="text-sm font-medium text-haven-text">
+                    {subject}
+                    <span className="ml-1.5 text-xs text-green-600 dark:text-green-400">(not suspicious)</span>
+                  </p>
+                  <p className="mt-1 text-xs text-haven-text-tertiary">{timeAgo(alert.timestamp)}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Connected + no alerts */}
-      {isConnected && emailAlerts.length === 0 && (
+      {isConnected && emailAlerts.length === 0 && reviewedEmails.length === 0 && (
         <div className="card p-6 text-center">
           <CheckCircle2 className="mx-auto h-8 w-8 text-green-500" />
           <p className="mt-3 text-sm font-semibold text-haven-text">Inbox looks clean</p>

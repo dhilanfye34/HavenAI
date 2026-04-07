@@ -79,21 +79,8 @@ async def update_preferences(
     preferences = _get_or_create_preferences(db, user.id)
     desktop_available = _desktop_available(db, user.id)
 
-    # Desktop gating for system monitoring modules.
-    requested_monitor_enable = any(
-        value is True
-        for value in (
-            payload.file_monitoring_enabled,
-            payload.process_monitoring_enabled,
-            payload.network_monitoring_enabled,
-        )
-    )
-    if requested_monitor_enable and not desktop_available:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Desktop app must be installed and linked before enabling monitoring modules.",
-        )
-
+    # Save preferences regardless of desktop availability — they'll be
+    # applied when the desktop app connects.
     update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(preferences, field, value)

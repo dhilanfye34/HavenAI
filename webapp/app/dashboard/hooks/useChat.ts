@@ -77,60 +77,113 @@ export function useChat() {
 
     const enabled = runtimeStatus.enabled_modules;
     const details = runtimeStatus.module_details;
-    const processTop = (details?.process?.top_processes || [])
-      .slice(0, 5)
-      .map((proc) => `${proc.name || 'unknown'}(${proc.pid ?? 'n/a'})`)
-      .join(', ');
-    const recentFile = details?.file?.recent_events?.slice(-1)?.[0];
-    const recentProcess = details?.process?.recent_events?.slice(-1)?.[0];
-    const recentNetwork = details?.network?.recent_events?.slice(-1)?.[0];
+    const metrics = runtimeStatus.metrics;
+
+    // ── Build a comprehensive digest for change detection ──
+    const fileEvents = details?.file?.recent_events || [];
+    const topProcesses = details?.process?.top_processes || [];
+    const activeConnections = details?.network?.active_connections || [];
+    const emailDetails = details?.email;
+    const emailFindings = emailDetails?.findings || [];
 
     const digest = JSON.stringify({
       enabled,
-      auth: runtimeStatus.auth_state,
-      alerts: runtimeStatus.alert_count,
-      metrics: runtimeStatus.metrics,
-      fileTs: recentFile?.timestamp || null,
-      processTs: recentProcess?.create_time || null,
-      networkTs: recentNetwork?.timestamp || null,
+      fileCount: fileEvents.length,
+      fileLatest: fileEvents[fileEvents.length - 1]?.timestamp || null,
+      processCount: topProcesses.length,
+      connectionCount: activeConnections.length,
+      emailFindings: emailFindings.length,
+      alertCount: runtimeStatus.alert_count,
     });
 
     const now = Date.now();
-    const minIntervalMs = 60000; // Inject at most once per minute to avoid flooding.
+    const minIntervalMs = 15000; // Update every 15s so context stays fresh
     if (digest === lastRuntimeDigestRef.current) return;
     if (now - lastRuntimeInjectAtRef.current < minIntervalMs) return;
 
     lastRuntimeDigestRef.current = digest;
     lastRuntimeInjectAtRef.current = now;
 
-    const blockedLikely = Boolean(runtimeStatus.permission_hints?.maybe_blocked);
-    const severity = blockedLikely ? 'warning' : 'info';
-    const descriptionParts = [
-      `Modules enabled: file=${enabled.file_monitoring_enabled}, process=${enabled.process_monitoring_enabled}, network=${enabled.network_monitoring_enabled}.`,
-      `Runtime counts: files=${runtimeStatus.metrics?.file_events_seen ?? 0}, process_events=${runtimeStatus.metrics?.process_events_seen ?? 0}, network_events=${runtimeStatus.metrics?.network_events_seen ?? 0}, active_connections=${runtimeStatus.metrics?.network_connection_count ?? 0}.`,
-      processTop ? `Top processes: ${processTop}.` : '',
-      recentFile
-        ? `Latest file event: ${recentFile.type || 'event'} ${recentFile.filename || recentFile.path || 'unknown file'}.`
-        : '',
-      recentProcess
-        ? `Latest process event: ${recentProcess.name || 'unknown'} (pid ${recentProcess.pid ?? 'n/a'}).`
-        : '',
-      recentNetwork
-        ? `Latest network event: ${recentNetwork.process_name || 'unknown'} -> ${recentNetwork.hostname || recentNetwork.remote_ip || 'unknown'}:${recentNetwork.remote_port ?? 'n/a'}.`
-        : '',
-    ].filter(Boolean);
+    // ── Build rich context with ALL available data ──
+    const parts: string[] = [];
 
-    setContextEvents((current) =>
-      [
+    // Overview
+    parts.push(
+      `Modules enabled: file=${enabled.file_monitoring_enabled}, process=${enabled.process_monitoring_enabled}, network=${enabled.network_monitoring_enabled}.`,
+    );
+    parts.push(
+      `Counts: ${metrics?.file_events_seen ?? 0} file events, ${metrics?.process_events_seen ?? 0} process events, ${metrics?.network_connection_count ?? 0} active connections.`,
+    );
+
+    // ALL recent file events (not just the last one)
+    if (fileEvents.length > 0) {
+      parts.push(`\nRECENT FILE EVENTS (${fileEvents.length}):`);
+      for (const ev of fileEvents.slice(-20)) {
+        const name = ev.filename || ev.path?.split('/').pop() || 'unknown';
+        const type = ev.type || 'change';
+        const time = ev.timestamp ? new Date(ev.timestamp * 1000).toLocaleTimeString() : 'unknown time';
+        parts.push(`  - ${type}: "${name}" at ${time}${ev.extension ? ` (${ev.extension})` : ''}${ev.size ? ` size=${ev.size}` : ''}`);
+      }
+    } else {
+      parts.push('\nNo recent file events detected.');
+    }
+
+    // ALL running processes
+    if (topProcesses.length > 0) {
+      parts.push(`\nRUNNING PROCESSES (${topProcesses.length}):`);
+      for (const proc of topProcesses.slice(0, 30)) {
+        const cpu = proc.cpu_percent != null ? `${proc.cpu_percent.toFixed(1)}% CPU` : '';
+        const mem = proc.memory_percent != null ? `${proc.memory_percent.toFixed(1)}% mem` : '';
+        const usage = [cpu, mem].filter(Boolean).join(', ');
+        parts.push(`  - ${proc.name || 'unknown'} (pid ${proc.pid ?? '?'})${usage ? ` [${usage}]` : ''}`);
+      }
+    }
+
+    // ALL active network connections
+    if (activeConnections.length > 0) {
+      parts.push(`\nACTIVE NETWORK CONNECTIONS (${activeConnections.length}):`);
+      for (const conn of activeConnections.slice(0, 30)) {
+        const dest = conn.hostname || conn.remote_ip || 'unknown';
+        parts.push(`  - ${conn.process_name || 'unknown'} -> ${dest}:${conn.remote_port ?? '?'} (${conn.status || 'established'})`);
+      }
+    }
+
+    // Email findings
+    const emailEnabled = Boolean(emailDetails?.enabled);
+    if (emailEnabled) {
+      const scanned = emailDetails?.total_scanned || 0;
+      parts.push(`\nEMAIL: ${scanned} emails scanned.`);
+      if (emailFindings.length > 0) {
+        parts.push(`SUSPICIOUS EMAILS (${emailFindings.length}):`);
+        for (const f of emailFindings.slice(0, 10)) {
+          const subj = f.email?.subject || 'unknown subject';
+          const from = f.email?.from_email || 'unknown sender';
+          const risk = f.risk_score != null ? `risk=${(f.risk_score * 100).toFixed(0)}%` : '';
+          const reasons = f.reasons?.join('; ') || '';
+          parts.push(`  - "${subj}" from ${from} ${risk}${reasons ? ` (${reasons})` : ''}`);
+        }
+      } else {
+        parts.push('No suspicious emails detected.');
+      }
+    } else {
+      parts.push('\nEmail monitoring: not connected.');
+    }
+
+    const blockedLikely = Boolean(runtimeStatus.permission_hints?.maybe_blocked);
+
+    // Replace previous runtime context (don't stack old ones)
+    setContextEvents((current) => {
+      const filtered = current.filter((e) => e.source !== 'Runtime Telemetry');
+      return [
         {
           source: 'Runtime Telemetry',
-          severity,
+          severity: blockedLikely ? 'warning' : 'info',
           timestamp: new Date().toISOString(),
-          description: descriptionParts.join(' '),
+          description: parts.join('\n'),
         },
-        ...current,
-      ].slice(0, 30),
-    );
+        ...filtered,
+      ].slice(0, 30);
+    });
   };
 
   const removeContextEvent = (index: number) => {

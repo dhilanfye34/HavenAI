@@ -14,6 +14,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
 
+  // If already authenticated, redirect to root (dashboard)
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    const user = localStorage.getItem('user');
+    if (token && user) {
+      window.location.href = '/';
+    }
+  }, []);
+
   useEffect(() => {
     const havenai = (window as any).havenai;
     if (havenai?.onDeviceLinkedError) {
@@ -74,7 +83,7 @@ export default function LoginPage() {
         });
       }
 
-      window.location.reload();
+      window.location.href = '/';
     } catch (err: any) {
       setError(err.message || 'Failed to fetch');
     } finally {

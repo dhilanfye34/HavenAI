@@ -147,7 +147,8 @@ export default function SettingsPage() {
     localStorage.setItem('haven-theme', next ? 'dark' : 'light');
   };
 
-  const desktopLocked = !preferences?.desktop_available && !isDesktopRuntime;
+  // Allow toggles even without desktop linked — backend handles gracefully
+  const desktopLocked = false;
 
   const handleSmsPhoneSave = () => {
     const normalized = normalizePhone(smsPhone);

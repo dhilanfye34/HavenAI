@@ -1,17 +1,23 @@
 'use client';
 
+import { useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Eye,
   FileSearch,
   Mail,
+  Monitor,
   ShieldCheck,
   Wifi,
+  X,
 } from 'lucide-react';
 import { useDashboard, ProtectionArea } from './context/DashboardContext';
 import { useNavigate } from './context/NavigationContext';
+import { Recommendation } from './types';
 
 const AREA_ICON: Record<string, typeof Eye> = {
   files: FileSearch,
@@ -59,13 +65,110 @@ function statusTextClass(status: ProtectionArea['status']) {
   return 'text-red-600 dark:text-red-400';
 }
 
+function severityIcon(severity: Recommendation['severity']) {
+  if (severity === 'critical') return <AlertTriangle className="h-4 w-4 text-red-500" />;
+  if (severity === 'warning') return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+  return <ShieldCheck className="h-4 w-4 text-blue-500" />;
+}
+
+function severityBorderClass(severity: Recommendation['severity']) {
+  if (severity === 'critical') return 'border-l-red-500';
+  if (severity === 'warning') return 'border-l-amber-500';
+  return 'border-l-blue-500';
+}
+
+function ActionItemCard({ item }: { item: Recommendation }) {
+  const [expanded, setExpanded] = useState(false);
+  const navigate = useNavigate();
+
+  return (
+    <div className={`card overflow-hidden transition-all ${expanded ? `border-l-4 ${severityBorderClass(item.severity)}` : ''}`}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-3 p-4 text-left hover:bg-haven-surface-hover transition-colors"
+      >
+        {severityIcon(item.severity)}
+        <p className="flex-1 text-sm font-medium text-haven-text">{item.title}</p>
+        {expanded ? (
+          <ChevronDown className="h-4 w-4 text-haven-text-tertiary" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-haven-text-tertiary" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="border-t px-4 pb-4 pt-3 space-y-3" style={{ borderColor: 'var(--haven-border)' }}>
+          <p className="text-sm text-haven-text-secondary">{item.description}</p>
+
+          {/* Related alerts */}
+          {item.relatedAlerts.length > 0 && (
+            <div className="space-y-2">
+              {item.relatedAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="flex items-start gap-2 rounded-lg bg-haven-surface-hover p-2.5"
+                >
+                  <span className={`mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${
+                    alert.severity === 'critical' ? 'bg-red-500' : alert.severity === 'warning' ? 'bg-amber-500' : 'bg-blue-500'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-haven-text truncate">{alert.description}</p>
+                    <p className="text-[10px] text-haven-text-tertiary mt-0.5">
+                      {new Date(alert.timestamp).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Recommendation */}
+          <p className="text-sm text-haven-text-secondary italic">{item.recommendation}</p>
+
+          {/* Action button */}
+          {item.actionLabel && (
+            <button
+              onClick={() => navigate(item.targetPath)}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors"
+            >
+              {item.actionLabel}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function HomePage() {
-  const { healthScore, protectionAreas, actionItems, user } = useDashboard();
+  const { healthScore, protectionAreas, actionItems, user, runtimeStatus } = useDashboard();
   const navigate = useNavigate();
 
   const color = scoreColor(healthScore);
   const circumference = 2 * Math.PI * 54;
   const offset = circumference - (healthScore / 100) * circumference;
+
+  // Quick stats from runtime metrics
+  const metrics = runtimeStatus?.metrics;
+  const details = runtimeStatus?.module_details;
+  const quickStats = [
+    { label: 'Apps', value: metrics?.process_count ?? 0 },
+    { label: 'Connections', value: metrics?.network_connection_count ?? 0 },
+    { label: 'File events', value: metrics?.file_events_seen ?? 0 },
+    { label: 'Emails scanned', value: details?.email?.total_scanned ?? 0 },
+  ].filter((s) => s.value > 0);
+
+  // Welcome card dismissal
+  const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
+    try { return localStorage.getItem('haven-welcome-dismissed') === 'true'; } catch { return false; }
+  });
+  const dismissWelcome = () => {
+    setWelcomeDismissed(true);
+    localStorage.setItem('haven-welcome-dismissed', 'true');
+  };
+
+  const allEnabled = protectionAreas.every((a) => a.enabled);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -78,6 +181,49 @@ export default function HomePage() {
           Here&apos;s your security overview.
         </p>
       </div>
+
+      {/* Welcome / Onboarding Card */}
+      {!welcomeDismissed && (
+        <div className="card p-5 relative">
+          <button
+            onClick={dismissWelcome}
+            className="absolute top-3 right-3 text-haven-text-tertiary hover:text-haven-text transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-500/10">
+              <Monitor className="h-5 w-5 text-blue-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-haven-text">Haven monitors your device for security threats</h3>
+              <ul className="mt-2 space-y-1 text-xs text-haven-text-secondary">
+                <li className="flex items-center gap-2">
+                  <Eye className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                  Watches running apps for suspicious behavior
+                </li>
+                <li className="flex items-center gap-2">
+                  <Wifi className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                  Monitors network connections to unknown servers
+                </li>
+                <li className="flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                  Scans your email for phishing attempts
+                </li>
+              </ul>
+              {!allEnabled && (
+                <button
+                  onClick={() => navigate('/dashboard/settings')}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-600 transition-colors"
+                >
+                  Get started
+                  <ArrowRight className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Protection Score */}
       <div className="card p-8 flex flex-col items-center text-center">
@@ -112,6 +258,20 @@ export default function HomePage() {
         <p className="mt-1 text-sm text-haven-text-secondary">
           Your security score
         </p>
+
+        {/* Quick Stats */}
+        {quickStats.length > 0 && (
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {quickStats.map((stat) => (
+              <span
+                key={stat.label}
+                className="inline-flex items-center rounded-full bg-haven-surface-hover px-3 py-1 text-xs font-medium text-haven-text-secondary"
+              >
+                {stat.value} {stat.label.toLowerCase()}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Protection Areas */}
@@ -141,7 +301,7 @@ export default function HomePage() {
                 <div>
                   <p className="text-sm font-semibold text-haven-text">{area.label}</p>
                   <p className={`mt-0.5 text-xs font-medium ${statusTextClass(area.status)}`}>
-                    {area.enabled ? area.detail : area.detail}
+                    {area.detail}
                   </p>
                 </div>
               </button>
@@ -150,7 +310,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Action Items */}
+      {/* Action Items — Expandable */}
       {actionItems.length > 0 && actionItems[0].id !== 'all-good' && (
         <div>
           <h2 className="mb-4 text-base font-semibold text-haven-text">
@@ -161,19 +321,7 @@ export default function HomePage() {
           </h2>
           <div className="space-y-2">
             {actionItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => navigate(
-                  item.context === 'alerts' ? '/dashboard/alerts'
-                    : item.context === 'email' ? '/dashboard/email'
-                    : item.context === 'settings' ? '/dashboard/settings'
-                    : '/dashboard'
-                )}
-                className="card-hover flex w-full items-center justify-between p-4 text-left"
-              >
-                <p className="text-sm text-haven-text">{item.title}</p>
-                <ArrowRight className="h-4 w-4 text-haven-text-tertiary" />
-              </button>
+              <ActionItemCard key={item.id} item={item} />
             ))}
           </div>
         </div>

@@ -179,6 +179,7 @@ class EmailInboxAgent(Agent):
         self.shared_context[self.name]["findings"] = findings
         self.shared_context[self.name]["last_scan_count"] = len(observation.get("emails", []))
         self.shared_context[self.name]["enabled"] = observation.get("enabled", False)
+        self.shared_context[self.name]["total_scanned"] = len(self._seen_ids)
 
         return {"findings": findings}
 

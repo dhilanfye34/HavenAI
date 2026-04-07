@@ -169,14 +169,14 @@ export default function AboutPage() {
                   <line
                     key={`center-${i}`}
                     x1={node.x} y1={node.y}
-                    x2={50} y2={48}
+                    x2={50} y2={50}
                     stroke="rgba(139,92,246,0.1)"
                     strokeWidth="0.3"
                   />
                 ))}
               </svg>
               {/* Center coordinator node */}
-              <div className="absolute left-1/2 top-[48%] -translate-x-1/2 -translate-y-1/2">
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full border border-violet-500/20 bg-violet-500/10 shadow-[0_0_30px_rgba(139,92,246,0.15)]">
                   <Lightbulb className="h-5 w-5 text-violet-400" />
                 </div>
