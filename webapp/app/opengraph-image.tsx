@@ -1,9 +1,7 @@
 import { ImageResponse } from 'next/og';
 
-// Route segment config
 export const runtime = 'edge';
 
-// Image metadata
 export const alt = 'HavenAI — AI-Powered Personal Cybersecurity';
 export const size = {
   width: 1200,
@@ -11,7 +9,6 @@ export const size = {
 };
 export const contentType = 'image/png';
 
-// Image generation
 export default async function Image() {
   return new ImageResponse(
     (
@@ -23,21 +20,21 @@ export default async function Image() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#0a0a0f',
+          background:
+            'linear-gradient(135deg, #0a0a0f 0%, #0f0a1f 50%, #0a0a0f 100%)',
           position: 'relative',
-          fontFamily: 'Inter, sans-serif',
         }}
       >
-        {/* Blue glow top-left */}
+        {/* Blue glow top-left (linear gradient approximation) */}
         <div
           style={{
             position: 'absolute',
-            top: -200,
-            left: -200,
-            width: 700,
-            height: 700,
+            top: 0,
+            left: 0,
+            width: 800,
+            height: 500,
             background:
-              'radial-gradient(circle, rgba(59,130,246,0.25) 0%, rgba(59,130,246,0) 70%)',
+              'linear-gradient(135deg, rgba(59,130,246,0.22) 0%, rgba(59,130,246,0.05) 40%, transparent 70%)',
             display: 'flex',
           }}
         />
@@ -45,29 +42,17 @@ export default async function Image() {
         <div
           style={{
             position: 'absolute',
-            bottom: -200,
-            right: -200,
-            width: 700,
-            height: 700,
+            bottom: 0,
+            right: 0,
+            width: 800,
+            height: 500,
             background:
-              'radial-gradient(circle, rgba(139,92,246,0.28) 0%, rgba(139,92,246,0) 70%)',
+              'linear-gradient(315deg, rgba(139,92,246,0.28) 0%, rgba(139,92,246,0.06) 40%, transparent 70%)',
             display: 'flex',
           }}
         />
 
-        {/* Subtle grid */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-            display: 'flex',
-          }}
-        />
-
-        {/* Logo — shield with lock (matches ShieldLock.tsx) */}
+        {/* Logo tile — shield with lock */}
         <div
           style={{
             display: 'flex',
@@ -76,8 +61,8 @@ export default async function Image() {
             width: 140,
             height: 140,
             borderRadius: 32,
-            background: 'rgba(139,92,246,0.1)',
-            border: '1px solid rgba(139,92,246,0.25)',
+            background: 'rgba(139,92,246,0.12)',
+            border: '2px solid rgba(139,92,246,0.35)',
             marginBottom: 44,
           }}
         >
@@ -86,7 +71,7 @@ export default async function Image() {
             height="88"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#a78bfa"
+            stroke="#c4b5fd"
             strokeWidth={1.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -100,9 +85,9 @@ export default async function Image() {
         {/* Wordmark */}
         <div
           style={{
-            fontSize: 40,
+            fontSize: 38,
             fontWeight: 600,
-            color: '#ffffff',
+            color: '#c4b5fd',
             letterSpacing: '-0.02em',
             marginBottom: 28,
             display: 'flex',
@@ -116,14 +101,13 @@ export default async function Image() {
           style={{
             fontSize: 68,
             fontWeight: 700,
+            color: '#ffffff',
             letterSpacing: '-0.035em',
             textAlign: 'center',
             lineHeight: 1.1,
-            maxWidth: 960,
+            maxWidth: 980,
             display: 'flex',
-            background: 'linear-gradient(135deg, #ffffff 0%, #c4b5fd 100%)',
-            backgroundClip: 'text',
-            color: 'transparent',
+            padding: '0 40px',
           }}
         >
           AI-Powered Personal Cybersecurity
@@ -132,7 +116,7 @@ export default async function Image() {
         {/* Subtext */}
         <div
           style={{
-            fontSize: 30,
+            fontSize: 28,
             fontWeight: 400,
             color: '#94a3b8',
             marginTop: 32,
@@ -150,7 +134,7 @@ export default async function Image() {
             bottom: 0,
             left: 0,
             right: 0,
-            height: 4,
+            height: 5,
             background:
               'linear-gradient(90deg, transparent 0%, #3b82f6 30%, #8b5cf6 70%, transparent 100%)',
             display: 'flex',
