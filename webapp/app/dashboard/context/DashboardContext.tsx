@@ -11,6 +11,7 @@ import {
   AgentRuntimeStatus,
   AgentStatus,
   MonitorControlState,
+  ProtectionStatus,
   Recommendation,
   SecurityAlert,
   SetupPreferences,
@@ -19,6 +20,7 @@ import {
   ChatConnectionStatus,
   ChatContextEvent,
 } from '../types';
+import { useConnectionStatus, ConnectionStatus } from '../hooks/useConnectionStatus';
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -47,6 +49,8 @@ export interface DashboardState {
   isDesktopRuntime: boolean;
   agents: AgentStatus[];
   runtimeStatus: AgentRuntimeStatus | null;
+  protectionStatus: ProtectionStatus | null;
+  connection: ConnectionStatus;
   monitorControl: MonitorControlState | null | undefined;
   alerts: SecurityAlert[];
   alertCounts: { critical: number; warning: number; info: number };
@@ -251,12 +255,18 @@ export function DashboardProvider({
   const safelist = useSafelist();
   const {
     preferences,
+    protectionStatus,
     monitorControl,
     loading: preferencesLoading,
     saving: preferencesSaving,
     error: preferencesError,
     save: savePreferences,
   } = useSetupPreferences(token);
+  const connection = useConnectionStatus({
+    token,
+    runtimeStatus,
+    protectionStatus,
+  });
   const {
     messages: chatMessages,
     isResponding: chatIsResponding,
@@ -369,11 +379,37 @@ export function DashboardProvider({
   };
 
   // ── Per-area scores + overall score ──
+  const monitoringLive = connection.state === 'connected';
   const protectionAreas = useMemo<ProtectionArea[]>(() => {
     const fileEnabled = Boolean(preferences?.file_monitoring_enabled);
     const processEnabled = Boolean(preferences?.process_monitoring_enabled);
     const networkEnabled = Boolean(preferences?.network_monitoring_enabled);
     const emailEnabled = Boolean(preferences?.email_enabled);
+
+    // If the agent isn't actually reporting, don't fabricate a "protected" score
+    // — surface the real state so the user knows nothing is monitoring.
+    if (!monitoringLive) {
+      const inactiveDetail =
+        connection.state === 'no-device'
+          ? 'Install the desktop app to monitor this area'
+          : connection.state === 'disconnected'
+          ? 'Device offline — monitoring paused'
+          : 'Verifying monitoring…';
+      const inactive = (id: string, label: string, enabled: boolean): ProtectionArea => ({
+        id,
+        label,
+        enabled,
+        status: 'not-setup',
+        detail: inactiveDetail,
+        score: 0,
+      });
+      return [
+        inactive('files', 'Files', fileEnabled),
+        inactive('apps', 'Apps', processEnabled),
+        inactive('network', 'Network', networkEnabled),
+        inactive('email', 'Email', emailEnabled),
+      ];
+    }
 
     const fileState = monitorControl?.state.file;
     const processState = monitorControl?.state.process;
@@ -493,7 +529,7 @@ export function DashboardProvider({
         score: emailScore,
       },
     ];
-  }, [alerts, monitorControl, preferences, runtimeStatus, safelist.isSafe]);
+  }, [alerts, monitorControl, preferences, runtimeStatus, safelist.isSafe, monitoringLive, connection.state]);
 
   // ── Overall health score = weighted average of enabled area scores ──
   const healthScore = useMemo(() => {
@@ -677,6 +713,8 @@ export function DashboardProvider({
     isDesktopRuntime,
     agents,
     runtimeStatus,
+    protectionStatus,
+    connection,
     monitorControl,
     alerts,
     alertCounts,

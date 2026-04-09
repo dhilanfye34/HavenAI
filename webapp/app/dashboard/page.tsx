@@ -9,15 +9,20 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Download,
   Eye,
   FileSearch,
   Globe,
+  Loader2,
   Mail,
   MessageCircle,
   Monitor,
+  RefreshCw,
   Settings,
   ShieldCheck,
+  ShieldOff,
   Wifi,
+  WifiOff,
   X,
   Zap,
 } from 'lucide-react';
@@ -193,11 +198,13 @@ export default function HomePage() {
     actionItems,
     user,
     runtimeStatus,
+    connection,
     alerts,
     alertCounts,
     safelist,
     chatSendMessage,
   } = useDashboard();
+  const monitoringLive = connection.state === 'connected';
   const navigate = useNavigate();
 
   const color = scoreColor(healthScore);
@@ -408,8 +415,59 @@ export default function HomePage() {
     return events.sort((a, b) => b.timestamp - a.timestamp).slice(0, 15);
   }, [details]);
 
+  const connectionIcon =
+    connection.state === 'connected' ? <Wifi className="h-4 w-4" />
+    : connection.state === 'stale' ? <RefreshCw className="h-4 w-4 animate-spin" />
+    : connection.state === 'disconnected' ? <WifiOff className="h-4 w-4" />
+    : connection.state === 'no-device' ? <ShieldOff className="h-4 w-4" />
+    : <Loader2 className="h-4 w-4 animate-spin" />;
+
+  const connectionTone =
+    connection.state === 'connected'
+      ? 'border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400'
+      : connection.state === 'checking' || connection.state === 'stale'
+      ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+      : 'border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400';
+
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Connection banner */}
+      <div className={`card p-4 border ${connectionTone}`}>
+        <div className="flex items-start gap-3">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white/40 dark:bg-black/20">
+            {connectionIcon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">{connection.label}</p>
+            <p className="text-xs opacity-80 mt-0.5">{connection.detail}</p>
+            {connection.lastSeen && connection.state !== 'connected' && (
+              <p className="text-[11px] opacity-70 mt-1">
+                Last check-in: {new Date(connection.lastSeen).toLocaleString()}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {connection.state === 'no-device' && (
+              <button
+                onClick={() => navigate('/download')}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-600 transition-colors"
+              >
+                <Download className="h-3 w-3" />
+                Install
+              </button>
+            )}
+            <button
+              onClick={connection.recheck}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-current/30 px-3 py-1.5 text-xs font-medium hover:bg-white/20 dark:hover:bg-black/20 transition-colors"
+              title="Re-check connection"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Re-check
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Greeting */}
       <div>
         <h1 className="text-2xl font-semibold text-haven-text">
@@ -508,35 +566,66 @@ export default function HomePage() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Protection Score */}
         <div className="card p-8 flex flex-col items-center text-center">
-          <div className="relative h-36 w-36">
-            <svg className="h-36 w-36 -rotate-90" viewBox="0 0 128 128">
-              <circle
-                cx="64" cy="64" r="54"
-                stroke="var(--haven-border)"
-                strokeWidth="8"
-                fill="none"
-              />
-              <circle
-                cx="64" cy="64" r="54"
-                stroke={color}
-                strokeWidth="8"
-                fill="none"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={offset}
-                style={{ transition: 'stroke-dashoffset 1s ease-out' }}
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <p className={`text-4xl font-bold ${scoreTextClass(healthScore)}`}>
-                {healthScore}
+          {monitoringLive ? (
+            <>
+              <div className="relative h-36 w-36">
+                <svg className="h-36 w-36 -rotate-90" viewBox="0 0 128 128">
+                  <circle
+                    cx="64" cy="64" r="54"
+                    stroke="var(--haven-border)"
+                    strokeWidth="8"
+                    fill="none"
+                  />
+                  <circle
+                    cx="64" cy="64" r="54"
+                    stroke={color}
+                    strokeWidth="8"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={offset}
+                    style={{ transition: 'stroke-dashoffset 1s ease-out' }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <p className={`text-4xl font-bold ${scoreTextClass(healthScore)}`}>
+                    {healthScore}
+                  </p>
+                </div>
+              </div>
+              <p className={`mt-4 text-lg font-semibold ${scoreTextClass(healthScore)}`}>
+                {scoreLabel(healthScore)}
               </p>
-            </div>
-          </div>
-          <p className={`mt-4 text-lg font-semibold ${scoreTextClass(healthScore)}`}>
-            {scoreLabel(healthScore)}
-          </p>
-          <p className="mt-1 text-sm text-haven-text-secondary">Your security score</p>
+              <p className="mt-1 text-sm text-haven-text-secondary">Your security score</p>
+            </>
+          ) : (
+            <>
+              <div className="relative h-36 w-36 flex items-center justify-center">
+                <div className="h-36 w-36 rounded-full border-[8px] border-dashed border-haven-border flex items-center justify-center">
+                  <ShieldOff className="h-12 w-12 text-haven-text-tertiary" />
+                </div>
+              </div>
+              <p className="mt-4 text-lg font-semibold text-haven-text-secondary">
+                Monitoring inactive
+              </p>
+              <p className="mt-1 text-sm text-haven-text-tertiary">
+                {connection.state === 'no-device'
+                  ? 'Install the desktop app to start protecting this computer.'
+                  : connection.state === 'disconnected'
+                  ? 'Your device stopped checking in. Open the desktop app to resume.'
+                  : 'Verifying monitoring status…'}
+              </p>
+              {connection.state === 'no-device' && (
+                <button
+                  onClick={() => navigate('/download')}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Install desktop app
+                </button>
+              )}
+            </>
+          )}
         </div>
 
         {/* Today's Summary */}
