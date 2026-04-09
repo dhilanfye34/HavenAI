@@ -13,6 +13,8 @@ import {
   Wifi,
   ArrowRight,
   Sparkles,
+  Info,
+  MousePointerClick,
 } from 'lucide-react';
 import ShieldLock from '../components/ShieldLock';
 import { Navbar } from '../components/Navbar';
@@ -178,6 +180,61 @@ export default function DownloadPage() {
           </div>
         </section>
       )}
+
+      {/* Private beta notice — macOS Gatekeeper warning workaround */}
+      <section className="mx-auto max-w-xl px-6 pb-2">
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+              <Info className="h-4 w-4 text-amber-400" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-amber-300">Private beta · macOS install note</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-gray-400">
+                HavenAI is in private beta and the macOS build isn&rsquo;t notarized yet. The first
+                time you open it, macOS will say it can&rsquo;t verify the developer. This is expected
+                — here&rsquo;s how to get past it:
+              </p>
+              <ol className="mt-3 space-y-2 text-xs text-gray-400">
+                <li className="flex gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[10px] font-bold text-amber-300">
+                    1
+                  </span>
+                  <span className="pt-0.5">Open your Downloads folder and double-click <span className="font-mono text-amber-200">HavenAI.dmg</span> to mount it.</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[10px] font-bold text-amber-300">
+                    2
+                  </span>
+                  <span className="pt-0.5">Drag HavenAI into your Applications folder.</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[10px] font-bold text-amber-300">
+                    3
+                  </span>
+                  <span className="pt-0.5">
+                    Open Applications, <span className="inline-flex items-center gap-1 font-medium text-amber-200">
+                      <MousePointerClick className="h-3 w-3" /> right-click
+                    </span> (or Control-click) HavenAI, and choose <span className="font-medium text-amber-200">Open</span>.
+                  </span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[10px] font-bold text-amber-300">
+                    4
+                  </span>
+                  <span className="pt-0.5">
+                    In the dialog that appears, click <span className="font-medium text-amber-200">Open</span> again. From then on, double-clicking works normally.
+                  </span>
+                </li>
+              </ol>
+              <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
+                Why this happens: Apple requires paid developer certificates to skip this warning.
+                We&rsquo;re finalizing ours — future releases will install without any extra steps.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Other platforms */}
       <section className="mx-auto max-w-4xl px-6 py-8">
