@@ -54,7 +54,7 @@ export function Footer() {
           ))}
         </div>
         <div className="mt-10 border-t border-white/[0.06] pt-6 text-center text-xs text-gray-600">
-          &copy; {new Date().getFullYear()} HavenAI. University of Miami Senior Design Project.
+          &copy; {new Date().getFullYear()} HavenAI. All rights reserved.
         </div>
       </div>
     </footer>

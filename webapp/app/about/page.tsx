@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   Users,
-  GraduationCap,
+  Sparkles,
   Lock,
   Lightbulb,
   ArrowRight,
@@ -104,8 +104,7 @@ export default function AboutPage() {
             <span className="text-gradient">Personal Security</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-400">
-            A senior design project at the University of Miami — building AI-powered
-            personal cybersecurity that adapts to you.
+            Building AI-powered personal cybersecurity that adapts to you.
           </p>
         </div>
       </section>
@@ -224,19 +223,19 @@ export default function AboutPage() {
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10 md:p-14">
             <div className="mb-8 flex justify-center">
               <div className="inline-flex rounded-2xl bg-emerald-500/[0.08] p-4 text-emerald-400">
-                <GraduationCap className="h-8 w-8" />
+                <Sparkles className="h-8 w-8" />
               </div>
             </div>
             <h2 className="text-center text-3xl font-bold tracking-tight md:text-4xl">
-              Born at the <span className="text-gradient">University of Miami</span>
+              Why We <span className="text-gradient">Started</span>
             </h2>
             <div className="mt-10 grid gap-10 md:grid-cols-2">
               <div className="relative">
                 <h3 className="mb-3 text-lg font-semibold text-white">The Project</h3>
                 <p className="text-sm leading-relaxed text-gray-400">
-                  Built as a senior design project, HavenAI combines machine learning,
-                  systems programming, and modern web engineering to solve a real-world
-                  problem: making cybersecurity accessible and personal.
+                  HavenAI combines machine learning, systems programming, and modern
+                  web engineering to solve a real-world problem: making cybersecurity
+                  accessible and personal.
                 </p>
               </div>
               <div className="relative md:border-l md:border-white/[0.06] md:pl-10">

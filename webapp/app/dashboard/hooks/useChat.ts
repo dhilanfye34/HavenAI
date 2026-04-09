@@ -195,7 +195,7 @@ export function useChat() {
     lastRuntimeDigestRef.current = '';
   };
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = async (content: string, extraContext?: ChatContextEvent[]) => {
     const token = localStorage.getItem('access_token');
     if (!token) {
       setConnectionStatus('offline');
@@ -232,10 +232,25 @@ export function useChat() {
         role: message.role,
         content: message.content,
       }));
+      // Merge any extra context passed directly (newest-first), deduped by source+description.
+      const mergedContext: ChatContextEvent[] = extraContext && extraContext.length > 0
+        ? (() => {
+            const seen = new Set<string>();
+            const merged: ChatContextEvent[] = [];
+            for (const ev of [...extraContext, ...contextEventsRef.current]) {
+              const key = `${ev.source}|${(ev.description || '').slice(0, 80)}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              merged.push(ev);
+            }
+            return merged.slice(0, 30);
+          })()
+        : contextEventsRef.current;
+
       await streamChatCompletion({
         token,
         messages: outboundMessages,
-        contextEvents: contextEventsRef.current,
+        contextEvents: mergedContext,
         onToken: (tokenChunk) => {
           setMessages((current) =>
             current.map((message) =>

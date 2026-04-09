@@ -13,6 +13,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
+import { isKnownSafe } from '../lib/safetyChecks';
+import { timeAgo } from '../lib/timeAgo';
 
 interface AppInfo {
   id: string;
@@ -28,59 +30,26 @@ interface AppInfo {
   stillRunning: boolean;
 }
 
-// Known-safe process name fragments
-const KNOWN_SAFE_FRAGMENTS = [
-  'finder', 'dock', 'systemuiserver', 'loginwindow', 'windowserver',
-  'launchd', 'kernel_task', 'spotlight', 'mds',
-  'coreaudiod', 'bluetoothd', 'airportd', 'configd', 'distnoted',
-  'chrome', 'google chrome', 'safari', 'firefox', 'arc', 'brave',
-  'slack', 'discord', 'zoom', 'microsoft teams', 'teams',
-  'code', 'visual studio code', 'cursor',
-  'iterm', 'terminal', 'warp', 'alacritty',
-  'spotify', 'music', 'apple music',
-  'notes', 'reminders', 'calendar', 'mail',
-  'messages', 'facetime', 'photos',
-  'preview', 'textedit', 'pages', 'numbers', 'keynote',
-  'activity monitor', 'system preferences', 'system settings',
-  'figma', 'notion', 'obsidian', 'linear',
-  'docker', 'node', 'python', 'ruby', 'java', 'go',
-  'electron', 'havenai', 'haven',
-  'stocks', 'stockswidget', 'weather', 'weatherwidget',
-  'notificationcenter', 'usernoted', 'coreservices',
-  'cfprefsd', 'nsurlsessiond', 'trustd', 'opendirectoryd',
-  'logd', 'syslogd', 'sharingd', 'rapportd',
-  'bird', 'cloudd', 'assistantd', 'siri', 'suggestd',
-  'backupd', 'timed', 'powerd', 'thermald',
-  'amfid', 'endpointsecurity', 'syspolicyd',
-  'axvisual', 'universalaccess', 'voiceover',
-  'iconservices', 'lsd', 'corebrightness',
-  'watchdogd', 'symptomsd', 'networkserviceproxy',
-  'wifid', 'apsd', 'identityservices',
-];
-
-function isKnownSafe(name: string): boolean {
-  const lower = name.toLowerCase();
-  return KNOWN_SAFE_FRAGMENTS.some((frag) => lower.includes(frag));
-}
-
 function normalizeAppName(name: string): string {
-  return name
+  const cleaned = name
     .replace(/\s*\(Renderer\)/gi, '')
     .replace(/\s*\(GPU\)/gi, '')
     .replace(/\s*\(Plugin\)/gi, '')
     .replace(/\s*Helper$/gi, '')
-    .replace(/^\d+\.\d+\.\d+$/, 'Unknown')
-    .trim() || name;
+    .trim();
+  // Pure version strings (1.2.3, 10.15.7.1234, v2.0.1, etc.) are not real app names —
+  // they're usually the app's version field leaking through. Hide them.
+  if (/^v?\d+(\.\d+){1,4}$/.test(cleaned)) return 'Unknown';
+  // Single numeric tokens or very short garbage
+  if (/^\d+$/.test(cleaned)) return 'Unknown';
+  return cleaned || name;
 }
 
-function timeAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return 'Just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
+function isMeaningfulAppName(name: string): boolean {
+  if (!name || name === 'Unknown') return false;
+  if (/^v?\d+(\.\d+){0,4}$/.test(name)) return false;
+  if (name.length < 2) return false;
+  return true;
 }
 
 // How long to keep a flagged process visible after it disappears (1 minute)
@@ -326,8 +295,48 @@ export default function AppsPage() {
   }, [currentApps, verifiedApps]);
 
   const handleAddToChat = (app: AppInfo) => {
+    if (!isMeaningfulAppName(app.name)) {
+      // Don't bother the LLM with version-string or garbage names.
+      return;
+    }
     const status = app.stillRunning ? 'currently running' : 'recently ran';
-    chatSendMessage(`Tell me about the app "${app.name}" that is ${status} on my device. Is it safe? What does it do?`);
+
+    // Build a dedicated context event so the chat LLM has the exact process data for THIS app,
+    // regardless of whether it made the top-30 CPU cut in runtime telemetry.
+    const topProcs = details?.process.top_processes || [];
+    const matchingProcs = topProcs.filter(
+      (p) => normalizeAppName(p.name || '').toLowerCase() === app.name.toLowerCase(),
+    );
+    const procLines = matchingProcs.length > 0
+      ? matchingProcs.map((p) => {
+          const cpu = p.cpu_percent != null ? `${p.cpu_percent.toFixed(1)}% CPU` : '';
+          const mem = p.memory_percent != null ? `${p.memory_percent.toFixed(1)}% mem` : '';
+          const usage = [cpu, mem].filter(Boolean).join(', ');
+          return `  - ${p.name} (pid ${p.pid ?? '?'})${usage ? ` [${usage}]` : ''}`;
+        }).join('\n')
+      : `  - ${app.name} (no matching live process row — may have just exited)`;
+
+    const description = [
+      `App the user is asking about: "${app.name}"`,
+      `Status: ${status}`,
+      `Recognized by HavenAI: ${app.category === 'normal' ? 'yes' : 'NO — flagged for review'}`,
+      `Reason: ${app.reason}`,
+      `Process count: ${app.count}`,
+      `Total CPU: ${app.totalCpu.toFixed(2)}%, Total memory: ${app.totalMemory.toFixed(2)}%`,
+      `Live process rows:\n${procLines}`,
+    ].join('\n');
+
+    chatSendMessage(
+      `Tell me about the app "${app.name}" that is ${status} on my device. Is it safe? What does it do?`,
+      [
+        {
+          source: 'App Lookup',
+          severity: app.category === 'concern' ? 'critical' : app.category === 'review' ? 'warning' : 'info',
+          timestamp: new Date().toISOString(),
+          description,
+        },
+      ],
+    );
   };
 
   const handleMarkSafe = useCallback((app: AppInfo) => {

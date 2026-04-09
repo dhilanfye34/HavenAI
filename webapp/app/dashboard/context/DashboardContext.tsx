@@ -6,6 +6,7 @@ import { useAlerts } from '../hooks/useAlerts';
 import { useSetupPreferences } from '../hooks/useSetupPreferences';
 import { useChat } from '../hooks/useChat';
 import { useSafelist, SafelistState } from '../hooks/useSafelist';
+import { isKnownSafe, isSafeHost } from '../lib/safetyChecks';
 import {
   AgentRuntimeStatus,
   AgentStatus,
@@ -23,66 +24,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-// ── Known-safe fragments (shared with apps page logic) ──
-const KNOWN_SAFE_FRAGMENTS = [
-  'finder', 'dock', 'systemuiserver', 'loginwindow', 'windowserver',
-  'launchd', 'kernel_task', 'spotlight', 'mds',
-  'coreaudiod', 'bluetoothd', 'airportd', 'configd', 'distnoted',
-  'chrome', 'google chrome', 'safari', 'firefox', 'arc', 'brave',
-  'slack', 'discord', 'zoom', 'microsoft teams', 'teams',
-  'code', 'visual studio code', 'cursor',
-  'iterm', 'terminal', 'warp', 'alacritty',
-  'spotify', 'music', 'apple music',
-  'notes', 'reminders', 'calendar', 'mail',
-  'messages', 'facetime', 'photos',
-  'preview', 'textedit', 'pages', 'numbers', 'keynote',
-  'activity monitor', 'system preferences', 'system settings',
-  'figma', 'notion', 'obsidian', 'linear',
-  'docker', 'node', 'python', 'ruby', 'java', 'go',
-  'electron', 'havenai', 'haven',
-  'stocks', 'stockswidget', 'weather', 'weatherwidget',
-  'notificationcenter', 'usernoted', 'coreservices',
-  'cfprefsd', 'nsurlsessiond', 'trustd', 'opendirectoryd',
-  'logd', 'syslogd', 'sharingd', 'rapportd',
-  'bird', 'cloudd', 'assistantd', 'siri', 'suggestd',
-  'backupd', 'timed', 'powerd', 'thermald',
-  'amfid', 'endpointsecurity', 'syspolicyd',
-  'axvisual', 'universalaccess', 'voiceover',
-  'iconservices', 'lsd', 'corebrightness',
-  'watchdogd', 'symptomsd', 'networkserviceproxy',
-  'wifid', 'apsd', 'identityservices',
-];
-
-function isKnownSafe(name: string): boolean {
-  const lower = name.toLowerCase();
-  return KNOWN_SAFE_FRAGMENTS.some((frag) => lower.includes(frag));
-}
-
-const SAFE_HOST_FRAGMENTS = [
-  'apple.com', 'icloud.com', 'googleapis.com', 'google.com', 'gstatic.com',
-  'googleusercontent.com', 'googlevideo.com',
-  'microsoft.com', 'office.com', 'office365.com', 'live.com',
-  'github.com', 'githubusercontent.com',
-  'cloudflare.com', 'cloudflare.net',
-  'amazonaws.com', 'amazon.com',
-  'slack.com', 'discord.com',
-  'spotify.com', 'scdn.co',
-  'akamai.net', 'akamaized.net',
-  'fastly.net', 'cloudfront.net',
-  'facebook.com', 'meta.com', 'whatsapp.com', 'fbcdn.net',
-  'notion.so', 'figma.com', 'linear.app', 'vercel.app',
-  'anthropic.com', 'openai.com',
-  'docker.com', 'docker.io',
-  'zoom.us', 'dropbox.com', 'adobe.com',
-  'youtube.com', 'ytimg.com',
-  'twitter.com', 'x.com', 'linkedin.com', 'reddit.com',
-];
-
-function isSafeHost(hostname?: string): boolean {
-  if (!hostname) return false;
-  const h = hostname.toLowerCase();
-  return SAFE_HOST_FRAGMENTS.some((frag) => h.includes(frag));
-}
+// Safety check helpers are imported from lib/safetyChecks.ts
 
 export interface ProtectionArea {
   id: string;
@@ -122,7 +64,7 @@ export interface DashboardState {
   chatConnectionStatus: ChatConnectionStatus;
   chatConnectionLabel: string;
   chatContextEvents: ChatContextEvent[];
-  chatSendMessage: (message: string) => Promise<void> | void;
+  chatSendMessage: (message: string, extraContext?: ChatContextEvent[]) => Promise<void> | void;
   chatRemoveContext: (index: number) => void;
   chatClearContext: () => void;
   chatInjectAlertContext: (alert: SecurityAlert) => void;
