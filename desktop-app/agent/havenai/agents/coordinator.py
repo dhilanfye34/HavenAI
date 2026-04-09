@@ -661,6 +661,11 @@ class Coordinator:
                 "last_scan_count": int(email_ctx.get("last_scan_count", 0) or 0),
                 "findings": list(email_ctx.get("findings", []) or [])[-10:],
                 "total_scanned": int(email_ctx.get("total_scanned", 0) or 0),
+                "last_scan_at": float(email_ctx.get("last_scan_at", 0) or 0) or None,
+                "last_successful_scan_at": float(email_ctx.get("last_successful_scan_at", 0) or 0) or None,
+                "last_error": email_ctx.get("last_error") or None,
+                "last_error_at": float(email_ctx.get("last_error_at", 0) or 0) or None,
+                "consecutive_failures": int(email_ctx.get("consecutive_failures", 0) or 0),
             },
         }
 

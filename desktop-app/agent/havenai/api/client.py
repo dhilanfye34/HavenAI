@@ -5,12 +5,17 @@ Handles communication between the desktop agent and the cloud backend.
 """
 
 import httpx
+import os
 from typing import Optional, Dict, Any
 import logging
 import json
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Production backend URL. Override at runtime by setting HAVENAI_API_URL
+# (the Electron main process passes this based on app.isPackaged).
+DEFAULT_API_URL = "https://havenai-j4xu.onrender.com"
 
 
 class DeviceLinkedError(Exception):
@@ -32,8 +37,11 @@ class APIClient:
     - Alert syncing
     """
     
-    def __init__(self, base_url: str = "http://localhost:8000"):
-        self.base_url = base_url
+    def __init__(self, base_url: Optional[str] = None):
+        # Precedence: explicit arg > HAVENAI_API_URL env var > production default.
+        # Saved config.json may still override this below via _load_config().
+        self.base_url = base_url or os.environ.get("HAVENAI_API_URL") or DEFAULT_API_URL
+        logger.info(f"APIClient base_url: {self.base_url}")
         self.access_token: Optional[str] = None
         self.refresh_token: Optional[str] = None
         self.device_id: Optional[str] = None
@@ -71,9 +79,12 @@ class APIClient:
                 config = json.loads(CONFIG_FILE.read_text())
                 self.device_id = config.get("device_id")
                 self.user_id = config.get("user_id")
-                if config.get("base_url"):
+                # An explicit HAVENAI_API_URL env var always wins over saved
+                # config, so switching between dev (localhost) and packaged
+                # (prod) doesn't get stuck on a stale saved URL.
+                if config.get("base_url") and not os.environ.get("HAVENAI_API_URL"):
                     self.base_url = config.get("base_url")
-                logger.info("Loaded saved config (tokens provided at runtime)")
+                logger.info(f"Loaded saved config (base_url={self.base_url}, tokens provided at runtime)")
                 return True
             except Exception as e:
                 logger.warning(f"Failed to load config: {e}")

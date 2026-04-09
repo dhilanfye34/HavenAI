@@ -22,6 +22,7 @@ interface ProviderInfo {
   imapPort: number;
   instructionsUrl: string;
   steps: string[];
+  warning?: string;
 }
 
 const EMAIL_PROVIDERS: Record<string, ProviderInfo> = {
@@ -58,6 +59,8 @@ const EMAIL_PROVIDERS: Record<string, ProviderInfo> = {
     imapHost: 'outlook.office365.com',
     imapPort: 993,
     instructionsUrl: 'https://account.microsoft.com/security',
+    warning:
+      'Microsoft has disabled app-password IMAP for most personal Outlook/Hotmail/Live accounts. Connecting may fail — if it does, the account type isn\u2019t supported yet. Business Microsoft 365 tenants that explicitly allow IMAP still work.',
     steps: [
       'Go to your Microsoft Account security page',
       'Turn on Two-step verification if not already on',
@@ -71,6 +74,8 @@ const EMAIL_PROVIDERS: Record<string, ProviderInfo> = {
     imapHost: 'outlook.office365.com',
     imapPort: 993,
     instructionsUrl: 'https://account.microsoft.com/security',
+    warning:
+      'Microsoft has disabled app-password IMAP for most personal Outlook/Hotmail/Live accounts. Connecting may fail — if it does, the account type isn\u2019t supported yet. Business Microsoft 365 tenants that explicitly allow IMAP still work.',
     steps: [
       'Go to your Microsoft Account security page',
       'Turn on Two-step verification if not already on',
@@ -84,6 +89,8 @@ const EMAIL_PROVIDERS: Record<string, ProviderInfo> = {
     imapHost: 'outlook.office365.com',
     imapPort: 993,
     instructionsUrl: 'https://account.microsoft.com/security',
+    warning:
+      'Microsoft has disabled app-password IMAP for most personal Outlook/Hotmail/Live accounts. Connecting may fail — if it does, the account type isn\u2019t supported yet. Business Microsoft 365 tenants that explicitly allow IMAP still work.',
     steps: [
       'Go to your Microsoft Account security page',
       'Turn on Two-step verification if not already on',
@@ -155,11 +162,38 @@ function detectProvider(email: string): ProviderInfo | null {
 
 export default function EmailPage() {
   const {
-    preferences, isDesktopRuntime, alerts, chatSendMessage, safelist,
+    preferences, isDesktopRuntime, runtimeStatus, alerts, chatSendMessage, safelist,
     emailConnection, setEmailConnected, setEmailDisconnected, setEmailTesting, setEmailError,
   } = useDashboard();
 
-  const isConnected = emailConnection.status === 'connected';
+  // Reconcile the locally-stored email connection state with the real agent
+  // health so we don't keep saying "Active" after credentials break.
+  const emailHealth = runtimeStatus?.module_details?.email;
+  const hasRuntimeSignal = Boolean(emailHealth);
+  const agentReportsEnabled = Boolean(emailHealth?.enabled);
+  const lastScanSecs = emailHealth?.last_scan_at || null;
+  const lastSuccessSecs = emailHealth?.last_successful_scan_at || null;
+  const consecutiveFailures = emailHealth?.consecutive_failures ?? 0;
+  const runtimeError = emailHealth?.last_error || null;
+
+  // "Healthy" = local state says connected AND either agent confirms it's
+  // enabled with no consecutive failures, or we have no runtime signal yet
+  // (initial load / browser mode fallback to trust local state).
+  const isHealthy =
+    emailConnection.status === 'connected' &&
+    (!hasRuntimeSignal || (agentReportsEnabled && consecutiveFailures < 3));
+  const isConnected = isHealthy;
+  // Error state: local state says connected but runtime shows repeated failures
+  const hasBrokenCreds =
+    emailConnection.status === 'connected' &&
+    hasRuntimeSignal &&
+    consecutiveFailures >= 3 &&
+    Boolean(runtimeError);
+
+  // Freshness label
+  const lastSuccessfulAt = lastSuccessSecs ? new Date(lastSuccessSecs * 1000).toISOString() : null;
+  const lastScanAt = lastScanSecs ? new Date(lastScanSecs * 1000).toISOString() : null;
+  const totalScanned = emailHealth?.total_scanned ?? 0;
 
   const [emailAddress, setEmailAddress] = useState(emailConnection.email || '');
   const [appPassword, setAppPassword] = useState('');
@@ -182,7 +216,16 @@ export default function EmailPage() {
     );
     const seen = new Set<string>();
     return raw.filter((a) => {
-      const key = a.description;
+      // Prefer the IMAP Message-ID from the alert details (unique per message).
+      // Fall back to subject+sender, and finally the full description, so
+      // different emails with identical subjects from different senders
+      // aren't collapsed together.
+      const details = typeof a.details === 'string' ? null : (a.details as any);
+      const key =
+        details?.message_id ||
+        (details?.subject && details?.from_email
+          ? `${details.subject}::${details.from_email}`
+          : a.description);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -242,32 +285,64 @@ export default function EmailPage() {
       </div>
 
       {/* Status */}
-      <div className="card p-5 flex items-center justify-between">
+      <div className={`card p-5 flex items-center justify-between ${hasBrokenCreds ? 'border-red-300 dark:border-red-500/30 bg-red-50/50 dark:bg-red-500/5' : ''}`}>
         <div className="flex items-center gap-3">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isConnected ? 'bg-green-500/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
-            <Mail className={`h-5 w-5 ${isConnected ? 'text-green-500' : 'text-haven-text-tertiary'}`} />
+          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+            hasBrokenCreds
+              ? 'bg-red-500/10'
+              : isConnected
+              ? 'bg-green-500/10'
+              : 'bg-gray-100 dark:bg-gray-800'
+          }`}>
+            <Mail className={`h-5 w-5 ${
+              hasBrokenCreds
+                ? 'text-red-500'
+                : isConnected
+                ? 'text-green-500'
+                : 'text-haven-text-tertiary'
+            }`} />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-medium text-haven-text">
-              {isConnected
+              {hasBrokenCreds
+                ? 'Email monitoring has stopped'
+                : isConnected
                 ? 'Email monitoring is active'
                 : 'Email monitoring is not connected'}
             </p>
             <p className="text-xs text-haven-text-tertiary">
-              {isConnected
-                ? `Connected to ${emailConnection.providerName || 'your email'} (${emailConnection.email})`
+              {hasBrokenCreds
+                ? (runtimeError || 'We can\u2019t reach your inbox. Reconnect with a fresh app password.')
+                : isConnected
+                ? `Connected to ${emailConnection.providerName || 'your email'}${emailConnection.email ? ` (${emailConnection.email})` : ''}`
                 : 'Connect your email to scan for threats'}
             </p>
+            {isConnected && !hasBrokenCreds && (lastSuccessfulAt || totalScanned > 0) && (
+              <p className="mt-1 text-[11px] text-haven-text-tertiary">
+                {lastSuccessfulAt ? `Last scan ${timeAgo(lastSuccessfulAt)}` : 'Waiting for first scan'}
+                {totalScanned > 0 && ` · ${totalScanned.toLocaleString()} message${totalScanned === 1 ? '' : 's'} scanned`}
+              </p>
+            )}
           </div>
         </div>
-        {isConnected ? (
-          <button
-            onClick={handleDisconnect}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-500 transition hover:bg-red-50 dark:hover:bg-red-500/10"
-          >
-            <Unplug className="h-3.5 w-3.5" />
-            Disconnect
-          </button>
+        {(isConnected || hasBrokenCreds) ? (
+          <div className="flex items-center gap-2">
+            {hasBrokenCreds && (
+              <button
+                onClick={() => setShowSetup(true)}
+                className="flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-600"
+              >
+                Reconnect
+              </button>
+            )}
+            <button
+              onClick={handleDisconnect}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-500 transition hover:bg-red-50 dark:hover:bg-red-500/10"
+            >
+              <Unplug className="h-3.5 w-3.5" />
+              Disconnect
+            </button>
+          </div>
         ) : (
           <span className="status-dot-inactive" />
         )}
@@ -398,8 +473,15 @@ export default function EmailPage() {
           <CheckCircle2 className="mx-auto h-8 w-8 text-green-500" />
           <p className="mt-3 text-sm font-semibold text-haven-text">Inbox looks clean</p>
           <p className="mt-1 text-xs text-haven-text-secondary">
-            We&apos;re scanning your inbox every 20 seconds. We&apos;ll alert you if anything looks suspicious.
+            {lastSuccessfulAt
+              ? `Last checked ${timeAgo(lastSuccessfulAt)}. We\u2019ll alert you if anything looks suspicious.`
+              : 'We\u2019re scanning your inbox every 20 seconds. We\u2019ll alert you if anything looks suspicious.'}
           </p>
+          {totalScanned > 0 && (
+            <p className="mt-2 text-[11px] text-haven-text-tertiary">
+              {totalScanned.toLocaleString()} message{totalScanned === 1 ? '' : 's'} scanned since connecting
+            </p>
+          )}
         </div>
       )}
 
@@ -467,6 +549,15 @@ export default function EmailPage() {
                 className="input-field"
               />
             </div>
+
+            {provider?.warning && (
+              <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-3">
+                <div className="flex gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+                  <p className="text-xs text-amber-700 dark:text-amber-300">{provider.warning}</p>
+                </div>
+              </div>
+            )}
 
             {provider && (
               <div className="rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 p-4">

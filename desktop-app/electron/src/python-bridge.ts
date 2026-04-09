@@ -91,12 +91,22 @@ export class PythonBridge extends EventEmitter {
     console.log(`Starting Python agent: ${pythonPath} ${mainScript}`);
     console.log(`Agent directory: ${agentPath}`);
 
+    // Packaged builds talk to the hosted Render backend; dev mode talks to
+    // whatever HAVENAI_API_URL is already in the shell env (or falls through
+    // to the agent's own default, which is localhost for dev).
+    const packagedApiUrl = 'https://havenai-j4xu.onrender.com';
+    const apiUrl = app.isPackaged
+      ? packagedApiUrl
+      : (process.env.HAVENAI_API_URL || 'http://localhost:8000');
+    console.log(`Python agent HAVENAI_API_URL=${apiUrl} (packaged=${app.isPackaged})`);
+
     this.process = spawn(pythonPath, [mainScript], {
       cwd: agentPath,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
         PYTHONUNBUFFERED: '1', // Disable Python output buffering
+        HAVENAI_API_URL: apiUrl,
       },
     });
 

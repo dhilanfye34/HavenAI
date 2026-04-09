@@ -8,7 +8,8 @@
  * - Shows native notifications
  */
 
-import { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, safeStorage } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, safeStorage, dialog } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -127,6 +128,8 @@ function buildMonitorControlState() {
 
 function emitMonitorControlState() {
   mainWindow?.webContents.send('monitor-state', buildMonitorControlState());
+  // Keep the tray menu label ("X of N monitors running") in sync with reality
+  refreshTrayMenu();
 }
 
 function checkMonitorPermissions(module: MonitorModule): { allowed: boolean; blockers: string[]; degraded?: boolean; degradedReason?: string } {
@@ -294,14 +297,19 @@ function createWindow(): void {
 /**
  * Create the system tray icon
  */
-function createTray(): void {
-  const iconPath = getTrayIconPath();
-  const icon = nativeImage.createFromPath(iconPath);
-  
-  tray = new Tray(icon.resize({ width: 16, height: 16 }));
-  tray.setToolTip('HavenAI - Protecting your system');
+function buildTrayMenu(): Menu {
+  // Reflect the real monitor state instead of hardcoding "Active".
+  const state = readMonitorStateMap();
+  const running = MONITOR_MODULES.filter((m) => state[m] === 'running').length;
+  const total = MONITOR_MODULES.length;
+  const statusLabel =
+    running === total
+      ? 'All monitors running'
+      : running === 0
+      ? 'Monitoring paused'
+      : `${running} of ${total} monitors running`;
 
-  const contextMenu = Menu.buildFromTemplate([
+  return Menu.buildFromTemplate([
     {
       label: 'Open HavenAI',
       click: () => {
@@ -309,8 +317,7 @@ function createTray(): void {
       },
     },
     {
-      label: 'Protection Status',
-      sublabel: 'Active',
+      label: statusLabel,
       enabled: false,
     },
     { type: 'separator' },
@@ -325,6 +332,21 @@ function createTray(): void {
         });
       },
     },
+    {
+      label: 'Check for updates…',
+      click: () => {
+        if (!app.isPackaged) {
+          dialog.showMessageBox({
+            type: 'info',
+            message: 'Update checks are disabled in development mode.',
+          });
+          return;
+        }
+        autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+          console.warn('Manual update check failed:', err?.message || err);
+        });
+      },
+    },
     { type: 'separator' },
     {
       label: 'Quit HavenAI',
@@ -334,8 +356,22 @@ function createTray(): void {
       },
     },
   ]);
+}
 
-  tray.setContextMenu(contextMenu);
+function refreshTrayMenu(): void {
+  if (tray) {
+    tray.setContextMenu(buildTrayMenu());
+  }
+}
+
+function createTray(): void {
+  const iconPath = getTrayIconPath();
+  const icon = nativeImage.createFromPath(iconPath);
+
+  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  tray.setToolTip('HavenAI — protecting your system');
+
+  tray.setContextMenu(buildTrayMenu());
 
   // Click on tray icon shows window
   tray.on('click', () => {
@@ -819,11 +855,70 @@ ipcMain.handle('open-permissions-settings', async (_, target?: 'file' | 'process
 
 // ============== App Lifecycle ==============
 
+// ============== Auto-update ==============
+//
+// Uses the GitHub Releases feed configured in package.json (build.publish).
+// Only runs in packaged builds; dev mode is a no-op so local work doesn't
+// try to hit GitHub every launch.
+function setupAutoUpdater(): void {
+  if (!app.isPackaged) {
+    console.log('Auto-updater disabled in dev mode');
+    return;
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Checking for update…');
+  });
+  autoUpdater.on('update-available', (info) => {
+    console.log(`Update available: ${info.version}`);
+    mainWindow?.webContents.send('update-available', { version: info.version });
+  });
+  autoUpdater.on('update-not-available', () => {
+    console.log('App is up to date');
+  });
+  autoUpdater.on('error', (err) => {
+    console.warn('Auto-updater error:', err?.message || err);
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`Update download progress: ${Math.round(progress.percent)}%`);
+  });
+  autoUpdater.on('update-downloaded', async (info) => {
+    console.log(`Update downloaded: ${info.version}`);
+    mainWindow?.webContents.send('update-downloaded', { version: info.version });
+    const result = await dialog.showMessageBox({
+      type: 'info',
+      title: 'HavenAI update ready',
+      message: `Version ${info.version} is ready to install.`,
+      detail:
+        'Restart HavenAI now to apply the update, or keep working and it will install the next time you quit the app.',
+      buttons: ['Restart now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (result.response === 0) {
+      isQuitting = true;
+      autoUpdater.quitAndInstall();
+    }
+  });
+
+  // Initial check shortly after launch + every 4 hours while running
+  setTimeout(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch(() => undefined);
+  }, 10_000);
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch(() => undefined);
+  }, 4 * 60 * 60 * 1000);
+}
+
 app.whenReady().then(() => {
   createWindow();
   createTray();
   initPythonBridge();
   emitMonitorControlState();
+  setupAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

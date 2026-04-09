@@ -16,13 +16,20 @@ const FOOTER_LINKS = [
       { href: '/about', label: 'About' },
     ],
   },
+  {
+    heading: 'Legal',
+    links: [
+      { href: '/privacy', label: 'Privacy' },
+      { href: '/terms', label: 'Terms' },
+    ],
+  },
 ];
 
 export function Footer() {
   return (
     <footer className="border-t border-white/[0.06] bg-[#0a0a0f]">
       <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="grid gap-10 md:grid-cols-3">
+        <div className="grid gap-10 md:grid-cols-4">
           <div>
             <Link href="/" className="inline-flex items-center gap-2.5">
               <ShieldLock className="h-6 w-6 text-cyan-400" />

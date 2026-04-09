@@ -4,19 +4,22 @@ Authentication Routes
 Handles user registration, login, and token management.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.models import User
 from app.schemas import UserCreate, UserLogin, AuthResponse, UserResponse, TokenResponse, RefreshRequest
 from app.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
+from app.rate_limit import limiter
 
 router = APIRouter()
 
 
+# Registration is the most abusable endpoint — tighter limit per IP.
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/hour")
+async def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
     """
     Register a new user account.
     
@@ -53,7 +56,8 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(credentials: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db)):
     """
     Login with email and password.
     
@@ -86,7 +90,8 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(body: RefreshRequest, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+async def refresh_token(request: Request, body: RefreshRequest, db: Session = Depends(get_db)):
     """
     Get a new access token using a refresh token.
     """

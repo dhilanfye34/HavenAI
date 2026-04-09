@@ -101,6 +101,11 @@ export interface AgentRuntimeStatus {
       enabled: boolean;
       last_scan_count: number;
       total_scanned: number;
+      last_scan_at?: number | null;
+      last_successful_scan_at?: number | null;
+      last_error?: string | null;
+      last_error_at?: number | null;
+      consecutive_failures?: number;
       findings: Array<{
         email?: {
           from_name?: string;

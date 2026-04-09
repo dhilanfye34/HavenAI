@@ -18,7 +18,8 @@
     "package:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -78,6 +79,13 @@
         "deb"
       ],
       "category": "Utility"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "dhilanfye34",
+        "repo": "HavenAI"
+      }
+    ]
   }
 }

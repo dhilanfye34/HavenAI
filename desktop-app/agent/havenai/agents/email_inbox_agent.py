@@ -100,9 +100,16 @@ class EmailInboxAgent(Agent):
     def perceive(self) -> Dict[str, Any]:
         """Fetch unseen inbox messages and return parsed metadata."""
         if not self._is_enabled():
-            return {"enabled": False, "emails": [], "timestamp": time.time()}
+            return {
+                "enabled": False,
+                "emails": [],
+                "timestamp": time.time(),
+                "scan_ok": False,
+            }
 
         emails: List[Dict[str, Any]] = []
+        scan_ok = False
+        last_error: Optional[str] = None
 
         try:
             with imaplib.IMAP4_SSL(self.imap_host, self.imap_port) as mail:
@@ -111,7 +118,13 @@ class EmailInboxAgent(Agent):
 
                 status, msg_nums = mail.search(None, "(UNSEEN)")
                 if status != "OK":
-                    return {"enabled": True, "emails": [], "timestamp": time.time()}
+                    return {
+                        "enabled": True,
+                        "emails": [],
+                        "timestamp": time.time(),
+                        "scan_ok": False,
+                        "error": "IMAP search failed",
+                    }
 
                 raw_ids = msg_nums[0].split()[-20:]
                 for msg_id in raw_ids:
@@ -147,13 +160,29 @@ class EmailInboxAgent(Agent):
                     )
 
                 logger.info(f"EmailInboxAgent scanned {len(raw_ids)} messages, {len(emails)} new")
+                scan_ok = True
 
         except imaplib.IMAP4.error as e:
-            logger.warning(f"EmailInboxAgent IMAP error: {e}")
+            msg = str(e)
+            logger.warning(f"EmailInboxAgent IMAP error: {msg}")
+            # imaplib raises this for both auth failures and protocol errors.
+            # Treat any mention of 'auth' / 'login' / 'credential' as a credential problem.
+            lower = msg.lower()
+            if any(w in lower for w in ("auth", "login", "credential", "password")):
+                last_error = "Authentication failed. Your app password may have been revoked or is incorrect."
+            else:
+                last_error = f"IMAP error: {msg}"
         except Exception as e:
             logger.debug(f"EmailInboxAgent mailbox poll failed: {e}")
+            last_error = f"Connection failed: {e}"
 
-        return {"enabled": True, "emails": emails, "timestamp": time.time()}
+        return {
+            "enabled": True,
+            "emails": emails,
+            "timestamp": time.time(),
+            "scan_ok": scan_ok,
+            "error": last_error,
+        }
 
     def analyze(self, observation: Dict[str, Any]) -> Dict[str, Any]:
         """Score each email and emit findings for suspicious ones."""
@@ -180,6 +209,23 @@ class EmailInboxAgent(Agent):
         self.shared_context[self.name]["last_scan_count"] = len(observation.get("emails", []))
         self.shared_context[self.name]["enabled"] = observation.get("enabled", False)
         self.shared_context[self.name]["total_scanned"] = len(self._seen_ids)
+
+        # Health tracking — surfaced via module_details.email so the UI can
+        # detect broken credentials, stale scans, etc.
+        now = observation.get("timestamp") or time.time()
+        scan_ok = bool(observation.get("scan_ok"))
+        error_msg = observation.get("error")
+        ctx = self.shared_context[self.name]
+        ctx["last_scan_at"] = now
+        if scan_ok:
+            ctx["last_successful_scan_at"] = now
+            ctx["last_error"] = None
+            ctx["consecutive_failures"] = 0
+        elif observation.get("enabled"):
+            ctx["consecutive_failures"] = int(ctx.get("consecutive_failures", 0) or 0) + 1
+            if error_msg:
+                ctx["last_error"] = error_msg
+                ctx["last_error_at"] = now
 
         return {"findings": findings}
 
