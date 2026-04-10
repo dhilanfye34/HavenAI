@@ -36,22 +36,12 @@
     },
     "files": [
       "dist/**/*",
-      "renderer/out/**/*",
-      "agent/**/*",
-      "!agent/venv/**/*",
-      "!agent/__pycache__/**/*",
-      "!agent/**/*.pyc"
+      "renderer/out/**/*"
     ],
     "extraResources": [
       {
-        "from": "agent",
-        "to": "agent",
-        "filter": [
-          "**/*",
-          "!venv/**/*",
-          "!__pycache__/**/*",
-          "!**/*.pyc"
-        ]
+        "from": "../agent/dist/havenai-agent",
+        "to": "agent/havenai-agent"
       }
     ],
     "mac": {

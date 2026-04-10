@@ -25,28 +25,30 @@ DOWNLOADS = {
         "label": "macOS",
         "filename": f"HavenAI-{APP_VERSION}-arm64.dmg",
         "url": _asset_url(f"HavenAI-{APP_VERSION}-arm64.dmg"),
-        "size": "85 MB",
+        "size": "130 MB",
         "min_os": "macOS 12 (Monterey)",
-        "arch": "Universal (Intel + Apple Silicon)",
+        "arch": "Apple Silicon (M1+) · Intel via Rosetta",
     },
-    "windows": {
-        "platform": "windows",
-        "label": "Windows",
-        "filename": f"HavenAI-Setup-{APP_VERSION}.exe",
-        "url": _asset_url(f"HavenAI-Setup-{APP_VERSION}.exe"),
-        "size": "78 MB",
-        "min_os": "Windows 10 (64-bit)",
-        "arch": "x64",
-    },
-    "linux": {
-        "platform": "linux",
-        "label": "Linux",
-        "filename": f"HavenAI-{APP_VERSION}.AppImage",
-        "url": _asset_url(f"HavenAI-{APP_VERSION}.AppImage"),
-        "size": "90 MB",
-        "min_os": "Ubuntu 20.04+ / Fedora 34+",
-        "arch": "x64",
-    },
+    # Windows and Linux builds are not available yet.
+    # Uncomment when you run package:win / package:linux and upload the artifacts.
+    # "windows": {
+    #     "platform": "windows",
+    #     "label": "Windows",
+    #     "filename": f"HavenAI-Setup-{APP_VERSION}.exe",
+    #     "url": _asset_url(f"HavenAI-Setup-{APP_VERSION}.exe"),
+    #     "size": "78 MB",
+    #     "min_os": "Windows 10 (64-bit)",
+    #     "arch": "x64",
+    # },
+    # "linux": {
+    #     "platform": "linux",
+    #     "label": "Linux",
+    #     "filename": f"HavenAI-{APP_VERSION}.AppImage",
+    #     "url": _asset_url(f"HavenAI-{APP_VERSION}.AppImage"),
+    #     "size": "90 MB",
+    #     "min_os": "Ubuntu 20.04+ / Fedora 34+",
+    #     "arch": "x64",
+    # },
 }
 
 

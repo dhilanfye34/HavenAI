@@ -78,18 +78,7 @@ export class PythonBridge extends EventEmitter {
       return;
     }
 
-    const pythonPath = this.getPythonPath();
     const agentPath = this.getAgentPath();
-    const mainScript = path.join(agentPath, 'main.py');
-
-    // Check if agent exists
-    if (!fs.existsSync(mainScript)) {
-      this.emit('error', `Agent script not found: ${mainScript}`);
-      return;
-    }
-
-    console.log(`Starting Python agent: ${pythonPath} ${mainScript}`);
-    console.log(`Agent directory: ${agentPath}`);
 
     // Packaged builds talk to the hosted Render backend; dev mode talks to
     // whatever HAVENAI_API_URL is already in the shell env (or falls through
@@ -100,15 +89,40 @@ export class PythonBridge extends EventEmitter {
       : (process.env.HAVENAI_API_URL || 'http://localhost:8000');
     console.log(`Python agent HAVENAI_API_URL=${apiUrl} (packaged=${app.isPackaged})`);
 
-    this.process = spawn(pythonPath, [mainScript], {
-      cwd: agentPath,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        PYTHONUNBUFFERED: '1', // Disable Python output buffering
-        HAVENAI_API_URL: apiUrl,
-      },
-    });
+    const envVars = {
+      ...process.env,
+      PYTHONUNBUFFERED: '1',
+      HAVENAI_API_URL: apiUrl,
+    };
+
+    // In packaged builds, use the PyInstaller-built binary (no Python needed).
+    // In dev, use the venv's Python + main.py directly.
+    const binaryPath = path.join(agentPath, 'havenai-agent');
+    if (app.isPackaged && fs.existsSync(binaryPath)) {
+      console.log(`Starting agent binary: ${binaryPath}`);
+      this.process = spawn(binaryPath, [], {
+        cwd: agentPath,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: envVars,
+      });
+    } else {
+      const pythonPath = this.getPythonPath();
+      const mainScript = path.join(agentPath, 'main.py');
+
+      if (!fs.existsSync(mainScript)) {
+        this.emit('error', `Agent script not found: ${mainScript}`);
+        return;
+      }
+
+      console.log(`Starting Python agent: ${pythonPath} ${mainScript}`);
+      console.log(`Agent directory: ${agentPath}`);
+
+      this.process = spawn(pythonPath, [mainScript], {
+        cwd: agentPath,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: envVars,
+      });
+    }
 
     // Handle stdin errors (EPIPE when Python exits while we're writing).
     this.process.stdin?.on('error', (err: any) => {
