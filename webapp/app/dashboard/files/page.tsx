@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { CheckCircle2, FileSearch, FileWarning, MessageCircle, ShieldCheck } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
+import { useNavigate } from '../context/NavigationContext';
 import { timeAgo } from '../lib/timeAgo';
 
 function friendlyEventType(type?: string): string {
@@ -16,10 +17,12 @@ function friendlyEventType(type?: string): string {
 }
 
 export default function FilesPage() {
-  const { runtimeStatus, preferences, alerts, chatSendMessage, safelist } = useDashboard();
+  const { runtimeStatus, preferences, alerts, chatSendMessage, safelist, isDesktopRuntime } = useDashboard();
+  const navigate = useNavigate();
   const fileEnabled = Boolean(preferences?.file_monitoring_enabled);
   const details = runtimeStatus?.module_details;
   const metrics = runtimeStatus?.metrics;
+  const hasLiveData = Boolean(details?.file.recent_events?.length);
 
   const recentEvents = useMemo(() => {
     return (details?.file.recent_events || [])
@@ -37,10 +40,12 @@ export default function FilesPage() {
 
   const askAboutFile = (filename: string, eventType: string) => {
     chatSendMessage(`Tell me about this file change: "${filename}" was ${eventType.toLowerCase()}. Is this normal? Should I be concerned?`);
+    navigate('/dashboard/chat');
   };
 
   const askAboutAlert = (description: string) => {
     chatSendMessage(`Tell me more about this file alert: "${description}". What should I do?`);
+    navigate('/dashboard/chat');
   };
 
   return (
@@ -175,6 +180,14 @@ export default function FilesPage() {
                 </div>
               );
             })}
+          </div>
+        ) : !isDesktopRuntime && !hasLiveData ? (
+          <div className="card p-6 text-center">
+            <FileSearch className="mx-auto h-8 w-8 text-haven-text-tertiary" />
+            <p className="mt-3 text-sm font-semibold text-haven-text">Live data available in the desktop app</p>
+            <p className="mt-1 text-xs text-haven-text-secondary">
+              File monitoring runs locally on your computer. Open the HavenAI desktop app to see file changes in real time.
+            </p>
           </div>
         ) : (
           <div className="card p-6 text-center">

@@ -9,10 +9,12 @@ import {
   Clock,
   Eye,
   MessageCircle,
+  Monitor,
   ShieldCheck,
   XCircle,
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
+import { useNavigate } from '../context/NavigationContext';
 import { isKnownSafe } from '../lib/safetyChecks';
 import { timeAgo } from '../lib/timeAgo';
 
@@ -158,9 +160,11 @@ function AppCard({
 }
 
 export default function AppsPage() {
-  const { runtimeStatus, preferences, chatSendMessage, safelist } = useDashboard();
+  const { runtimeStatus, preferences, chatSendMessage, safelist, isDesktopRuntime } = useDashboard();
+  const navigate = useNavigate();
   const processEnabled = Boolean(preferences?.process_monitoring_enabled);
   const details = runtimeStatus?.module_details;
+  const hasLiveData = Boolean(details?.process.top_processes?.length);
 
   // Persistent map of flagged processes — survives across re-renders and data refreshes
   const flaggedHistoryRef = useRef<Map<string, AppInfo>>(new Map());
@@ -337,6 +341,7 @@ export default function AppsPage() {
         },
       ],
     );
+    navigate('/dashboard/chat');
   };
 
   const handleMarkSafe = useCallback((app: AppInfo) => {
@@ -372,6 +377,17 @@ export default function AppsPage() {
         </div>
         <span className={processEnabled ? 'status-dot-safe' : 'status-dot-inactive'} />
       </div>
+
+      {/* Browser-mode notice */}
+      {!isDesktopRuntime && !hasLiveData && (
+        <div className="card p-6 text-center">
+          <Monitor className="mx-auto h-8 w-8 text-haven-text-tertiary" />
+          <p className="mt-3 text-sm font-semibold text-haven-text">Live data available in the desktop app</p>
+          <p className="mt-1 text-xs text-haven-text-secondary">
+            App monitoring runs locally on your computer. Open the HavenAI desktop app to see running apps and flagged processes in real time.
+          </p>
+        </div>
+      )}
 
       {/* Flagged — persistent history */}
       {flagged.length > 0 && (

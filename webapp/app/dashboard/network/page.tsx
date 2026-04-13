@@ -1,17 +1,63 @@
 'use client';
 
 import { useMemo } from 'react';
-import { AlertTriangle, CheckCircle2, Globe, MessageCircle, ShieldCheck, Wifi } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Globe, Lock, MessageCircle, Server, ShieldCheck, Wifi } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
+import { useNavigate } from '../context/NavigationContext';
 
 interface ConnectionInfo {
   id: string;
   app: string;
   destination: string;
-  service: string; // Human-readable service name
+  service: string;       // Human-readable service name (e.g. "Google", "stripe.com")
+  protocol: string;      // e.g. "HTTPS", "DNS", "SSH"
   port?: number;
   count: number;
   status: 'safe' | 'unknown';
+}
+
+// ── Port → protocol / description ──
+const PORT_INFO: Record<number, { protocol: string; desc: string }> = {
+  22:   { protocol: 'SSH',        desc: 'Secure shell' },
+  53:   { protocol: 'DNS',        desc: 'Domain name lookup' },
+  80:   { protocol: 'HTTP',       desc: 'Web traffic (unencrypted)' },
+  443:  { protocol: 'HTTPS',      desc: 'Encrypted web traffic' },
+  993:  { protocol: 'IMAPS',      desc: 'Email (IMAP)' },
+  995:  { protocol: 'POP3S',      desc: 'Email (POP3)' },
+  587:  { protocol: 'SMTP',       desc: 'Outgoing email' },
+  465:  { protocol: 'SMTPS',      desc: 'Outgoing email (encrypted)' },
+  853:  { protocol: 'DNS-TLS',    desc: 'Encrypted DNS' },
+  3478: { protocol: 'STUN/TURN',  desc: 'Video/voice call relay' },
+  5228: { protocol: 'GCM',        desc: 'Google push notifications' },
+  5222: { protocol: 'XMPP',       desc: 'Messaging' },
+  5223: { protocol: 'XMPP-TLS',   desc: 'Messaging (encrypted)' },
+  8443: { protocol: 'HTTPS-ALT',  desc: 'Encrypted web (alt port)' },
+};
+
+function getProtocolInfo(port?: number): { protocol: string; desc: string } {
+  if (!port) return { protocol: '', desc: '' };
+  return PORT_INFO[port] || { protocol: `Port ${port}`, desc: '' };
+}
+
+// ── Extract root domain from hostname ──
+// "api.v2.stripe.com" → "stripe.com"
+// "ec2-52-1-2-3.compute-1.amazonaws.com" → "amazonaws.com"
+function extractRootDomain(hostname: string): string {
+  const parts = hostname.toLowerCase().replace(/\.$/, '').split('.');
+  if (parts.length <= 2) return hostname.toLowerCase();
+  // Handle known two-part TLDs (co.uk, com.au, etc.)
+  const twoPartTLDs = ['co.uk', 'co.jp', 'com.au', 'co.in', 'com.br', 'co.za'];
+  const lastTwo = parts.slice(-2).join('.');
+  if (twoPartTLDs.includes(lastTwo) && parts.length >= 3) {
+    return parts.slice(-3).join('.');
+  }
+  return parts.slice(-2).join('.');
+}
+
+// Capitalize a domain for display: "stripe.com" → "Stripe"
+function domainToLabel(domain: string): string {
+  const name = domain.split('.')[0];
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 // ── Hostname-based identification ──
@@ -29,7 +75,7 @@ const SAFE_HOST_FRAGMENTS = [
   'cloudfront.net',
   'facebook.com', 'meta.com', 'whatsapp.com', 'fbcdn.net', 'instagram.com',
   'notion.so', 'figma.com', 'linear.app', 'vercel.app', 'vercel-dns.com',
-  'anthropic.com', 'openai.com',
+  'anthropic.com', 'claude.ai', 'openai.com', 'newrelic.com',
   'docker.com', 'docker.io',
   'npmjs.org', 'npmjs.com', 'yarnpkg.com',
   'sentry.io', 'segment.io', 'segment.com',
@@ -54,9 +100,15 @@ const IP_SERVICE_MAP: { prefix: string; service: string }[] = [
   { prefix: '64:ff9b::', service: 'Google (NAT64)' },
   // Google IPv4
   { prefix: '142.250.', service: 'Google' },
+  { prefix: '142.251.', service: 'Google' },
   { prefix: '172.217.', service: 'Google' },
   { prefix: '216.58.', service: 'Google' },
+  { prefix: '216.239.', service: 'Google' },
   { prefix: '74.125.', service: 'Google' },
+  { prefix: '173.194.', service: 'Google' },
+  { prefix: '209.85.', service: 'Google' },
+  { prefix: '108.177.', service: 'Google' },
+  { prefix: '35.', service: 'Google Cloud' },
   // Cloudflare IPv6
   { prefix: '2606:4700:', service: 'Cloudflare' },
   { prefix: '2a06:98c0:', service: 'Cloudflare' },
@@ -73,8 +125,12 @@ const IP_SERVICE_MAP: { prefix: string; service: string }[] = [
   { prefix: '104.25.', service: 'Cloudflare' },
   { prefix: '104.26.', service: 'Cloudflare' },
   { prefix: '104.27.', service: 'Cloudflare' },
+  { prefix: '162.159.', service: 'Cloudflare' },
   { prefix: '172.64.', service: 'Cloudflare' },
+  { prefix: '172.66.', service: 'Cloudflare' },
+  { prefix: '172.67.', service: 'Cloudflare' },
   { prefix: '173.245.', service: 'Cloudflare' },
+  { prefix: '198.41.', service: 'Cloudflare' },
   { prefix: '1.1.1.', service: 'Cloudflare DNS' },
   { prefix: '1.0.0.', service: 'Cloudflare DNS' },
   // AWS IPv6
@@ -103,6 +159,10 @@ const IP_SERVICE_MAP: { prefix: string; service: string }[] = [
   { prefix: '2620:149:', service: 'Apple' },
   // Fly.io
   { prefix: '2607:6bc0:', service: 'Fly.io' },
+  // Anthropic
+  { prefix: '160.79.', service: 'Anthropic (Claude)' },
+  // New Relic
+  { prefix: '162.247.', service: 'New Relic' },
   // Private/local
   { prefix: '192.168.', service: 'Local network' },
   { prefix: '10.', service: 'Local network' },
@@ -114,11 +174,15 @@ const IP_SERVICE_MAP: { prefix: string; service: string }[] = [
 
 // Hostname → friendly service name
 const HOSTNAME_SERVICE_MAP: { fragment: string; service: string }[] = [
+  { fragment: '1e100.net', service: 'Google' },
   { fragment: 'google', service: 'Google' },
   { fragment: 'googleapis', service: 'Google APIs' },
   { fragment: 'googleusercontent', service: 'Google' },
+  { fragment: 'googlevideo', service: 'Google Video' },
   { fragment: 'gstatic', service: 'Google' },
   { fragment: 'youtube', service: 'YouTube' },
+  { fragment: 'ytimg', service: 'YouTube' },
+  { fragment: 'ggpht', service: 'Google' },
   { fragment: 'apple.com', service: 'Apple' },
   { fragment: 'icloud', service: 'Apple iCloud' },
   { fragment: 'microsoft', service: 'Microsoft' },
@@ -152,6 +216,45 @@ const HOSTNAME_SERVICE_MAP: { fragment: string; service: string }[] = [
   { fragment: 'twilio', service: 'Twilio' },
   { fragment: 'adobe', service: 'Adobe' },
   { fragment: 'fly.io', service: 'Fly.io' },
+  // Update / package managers
+  { fragment: 'brew.sh', service: 'Homebrew' },
+  { fragment: 'pypi.org', service: 'PyPI (Python packages)' },
+  { fragment: 'rubygems.org', service: 'RubyGems' },
+  { fragment: 'crates.io', service: 'Rust Crates' },
+  // Analytics / tracking (common but safe)
+  { fragment: 'googletagmanager', service: 'Google Tag Manager' },
+  { fragment: 'doubleclick', service: 'Google Ads' },
+  { fragment: 'hotjar', service: 'Hotjar Analytics' },
+  { fragment: 'mixpanel', service: 'Mixpanel Analytics' },
+  { fragment: 'amplitude', service: 'Amplitude Analytics' },
+  { fragment: 'intercom', service: 'Intercom' },
+  // Communication
+  { fragment: 'slack-edge', service: 'Slack' },
+  { fragment: 'teams.microsoft', service: 'Microsoft Teams' },
+  { fragment: 'signal.org', service: 'Signal' },
+  { fragment: 'telegram.org', service: 'Telegram' },
+  // Streaming
+  { fragment: 'netflix', service: 'Netflix' },
+  { fragment: 'nflxvideo', service: 'Netflix Video' },
+  { fragment: 'hulu', service: 'Hulu' },
+  { fragment: 'disneyplus', service: 'Disney+' },
+  { fragment: 'twitch', service: 'Twitch' },
+  // Gaming
+  { fragment: 'steampowered', service: 'Steam' },
+  { fragment: 'steamcommunity', service: 'Steam' },
+  { fragment: 'epicgames', service: 'Epic Games' },
+  // OS updates
+  { fragment: 'swscan.apple', service: 'Apple Software Update' },
+  { fragment: 'mesu.apple', service: 'Apple Software Update' },
+  { fragment: 'updates.cdn-apple', service: 'Apple Updates CDN' },
+  { fragment: 'windowsupdate', service: 'Windows Update' },
+  // Security
+  { fragment: 'letsencrypt', service: 'Let\'s Encrypt' },
+  { fragment: 'ocsp', service: 'Certificate check (OCSP)' },
+  { fragment: 'crl.', service: 'Certificate check (CRL)' },
+  // Render (your backend)
+  { fragment: 'onrender.com', service: 'HavenAI Backend' },
+  { fragment: 'render.com', service: 'Render' },
 ];
 
 function identifyService(hostname?: string, ip?: string): string {
@@ -160,6 +263,12 @@ function identifyService(hostname?: string, ip?: string): string {
     const h = hostname.toLowerCase();
     for (const { fragment, service } of HOSTNAME_SERVICE_MAP) {
       if (h.includes(fragment)) return service;
+    }
+    // Fallback: use the root domain as a label
+    // "api.someapp.com" → "Someapp" instead of ""
+    const root = extractRootDomain(h);
+    if (root && !root.match(/^\d/)) {
+      return domainToLabel(root);
     }
   }
   // Try IP prefix
@@ -185,10 +294,12 @@ function isKnownService(hostname?: string, ip?: string): boolean {
 }
 
 export default function NetworkPage() {
-  const { runtimeStatus, preferences, alerts, chatSendMessage, safelist } = useDashboard();
+  const { runtimeStatus, preferences, alerts, chatSendMessage, safelist, isDesktopRuntime } = useDashboard();
+  const navigate = useNavigate();
   const networkEnabled = Boolean(preferences?.network_monitoring_enabled);
   const details = runtimeStatus?.module_details;
   const metrics = runtimeStatus?.metrics;
+  const hasLiveData = Boolean(details?.network.active_connections?.length);
 
   const connections = useMemo<ConnectionInfo[]>(() => {
     const raw = details?.network.active_connections || [];
@@ -196,41 +307,42 @@ export default function NetworkPage() {
       app: string;
       destination: string;
       service: string;
+      protocol: string;
       port?: number;
       known: boolean;
       count: number;
     }>();
 
     raw.forEach((c) => {
-      const dest = c.hostname || c.remote_ip || 'Unknown';
+      const dest = c.hostname || c.remote_ip || 'unknown';
       const key = dest.toLowerCase();
       const service = identifyService(c.hostname, c.remote_ip);
-      const known = isKnownService(c.hostname, c.remote_ip);
-      const app = c.process_name || '';
+      const known = isKnownService(c.hostname, c.remote_ip) || Boolean(service && service !== '');
+      const rawApp = c.process_name || '';
+      const app = rawApp === 'unknown' ? '' : rawApp;
+      const { protocol } = getProtocolInfo(c.remote_port);
       const existing = groups.get(key);
 
       if (existing) {
         existing.count++;
         if (!existing.app && app) existing.app = app;
         if (!existing.service && service) existing.service = service;
+        if (!existing.protocol && protocol) existing.protocol = protocol;
       } else {
-        groups.set(key, { app, destination: dest, service, port: c.remote_port, known, count: 1 });
+        groups.set(key, { app, destination: dest, service, protocol, port: c.remote_port, known, count: 1 });
       }
     });
 
-    return Array.from(groups.entries()).map(([key, g]) => {
-      // Display name: use process name, or service name, or "Unknown app"
-      const displayApp = g.app || g.service || 'Unknown app';
-      return {
-        id: key,
-        app: displayApp,
-        destination: g.destination,
-        service: g.service,
-        port: g.port,
-        count: g.count,
-        status: g.known ? 'safe' as const : 'unknown' as const,
-      };
-    });
+    return Array.from(groups.entries()).map(([key, g]) => ({
+      id: key,
+      app: g.app || '',
+      destination: g.destination,
+      service: g.service || 'Unknown service',
+      protocol: g.protocol || '',
+      port: g.port,
+      count: g.count,
+      status: (g.known || g.service) ? 'safe' as const : 'unknown' as const,
+    }));
   }, [details]);
 
   const flagged = connections.filter((c) => c.status === 'unknown' && !safelist.isSafe('hosts', c.destination));
@@ -300,41 +412,67 @@ export default function NetworkPage() {
             Unrecognized ({flagged.length})
           </h2>
           <div className="space-y-2">
-            {flagged.map((conn) => (
-              <div key={conn.id} className="card border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-haven-text">
-                      {conn.app}
-                      {conn.count > 1 && (
-                        <span className="ml-1.5 text-xs text-haven-text-tertiary">
-                          ({conn.count} connections)
+            {flagged.map((conn) => {
+              const portInfo = getProtocolInfo(conn.port);
+              return (
+                <div key={conn.id} className="card border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-haven-text truncate">
+                          {conn.service !== 'Unknown service' ? conn.service : conn.destination}
+                        </p>
+                        {conn.count > 1 && (
+                          <span className="shrink-0 rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                            {conn.count}×
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-haven-text-tertiary">
+                        {conn.app && (
+                          <span className="flex items-center gap-1">
+                            <Server className="h-3 w-3" />
+                            {conn.app}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1 truncate">
+                          <Globe className="h-3 w-3 shrink-0" />
+                          {conn.destination}
                         </span>
-                      )}
-                    </p>
-                    <p className="mt-1 text-xs text-haven-text-secondary truncate">
-                      {conn.destination}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => askAboutConnection(conn.app, conn.destination)}
-                      className="p-1.5 text-haven-text-tertiary transition hover:text-blue-500"
-                      title="Ask about this connection"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => safelist.markSafe('hosts', conn.destination)}
-                      className="p-1.5 text-haven-text-tertiary transition hover:text-green-500"
-                      title="Mark as safe"
-                    >
-                      <ShieldCheck className="h-4 w-4" />
-                    </button>
+                        {portInfo.protocol && (
+                          <span className="flex items-center gap-1">
+                            <Lock className="h-3 w-3" />
+                            {portInfo.protocol}
+                            {portInfo.desc && <span className="hidden sm:inline text-haven-text-tertiary">· {portInfo.desc}</span>}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                      <button
+                        onClick={() => {
+                          askAboutConnection(conn.app || conn.service, conn.destination);
+                          navigate('/dashboard/chat');
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-haven-text-secondary transition hover:text-blue-500 hover:border-blue-500"
+                        style={{ borderColor: 'var(--haven-border)' }}
+                      >
+                        <MessageCircle className="h-3 w-3" />
+                        Ask
+                      </button>
+                      <button
+                        onClick={() => safelist.markSafe('hosts', conn.destination)}
+                        className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-haven-text-secondary transition hover:text-green-500 hover:border-green-500"
+                        style={{ borderColor: 'var(--haven-border)' }}
+                      >
+                        <ShieldCheck className="h-3 w-3" />
+                        Safe
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -347,42 +485,76 @@ export default function NetworkPage() {
             Recognized services ({safe.length})
           </h2>
           <div className="card divide-y" style={{ borderColor: 'var(--haven-border)' }}>
-            {safe.slice(0, 30).map((conn) => (
-              <div key={conn.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-haven-text truncate">
-                    {conn.service || conn.app}
-                    {conn.count > 1 && (
-                      <span className="ml-1.5 text-xs text-haven-text-tertiary">
-                        ({conn.count})
+            {safe.slice(0, 30).map((conn) => {
+              const portInfo = getProtocolInfo(conn.port);
+              return (
+                <div key={conn.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-haven-text truncate">
+                        {conn.service}
+                      </p>
+                      {conn.count > 1 && (
+                        <span className="shrink-0 rounded-full bg-haven-surface-hover px-2 py-0.5 text-[10px] font-medium text-haven-text-tertiary">
+                          {conn.count}×
+                        </span>
+                      )}
+                      {safelist.isSafe('hosts', conn.destination) && (
+                        <span className="shrink-0 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
+                          verified
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-haven-text-tertiary">
+                      {conn.app && (
+                        <span className="flex items-center gap-1">
+                          <Server className="h-3 w-3" />
+                          {conn.app}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1 truncate">
+                        <Globe className="h-3 w-3 shrink-0" />
+                        {conn.destination}
                       </span>
-                    )}
-                    {safelist.isSafe('hosts', conn.destination) && (
-                      <span className="ml-1.5 text-xs text-green-600 dark:text-green-400">(verified by you)</span>
-                    )}
-                  </p>
-                  <p className="text-xs text-haven-text-tertiary truncate">
-                    <Globe className="inline h-3 w-3 mr-1" />
-                    {conn.destination}
-                  </p>
+                      {portInfo.protocol && (
+                        <span className="flex items-center gap-1">
+                          <Lock className="h-3 w-3" />
+                          {portInfo.protocol}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        askAboutConnection(conn.service || conn.app, conn.destination);
+                        navigate('/dashboard/chat');
+                      }}
+                      className="p-1.5 text-haven-text-tertiary transition hover:text-blue-500"
+                      title="Ask about this connection"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                    <span className="status-dot-safe" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => askAboutConnection(conn.service || conn.app, conn.destination)}
-                    className="p-1.5 text-haven-text-tertiary transition hover:text-blue-500"
-                    title="Ask about this connection"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </button>
-                  <span className="status-dot-safe" />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {!networkEnabled && (
+      {!isDesktopRuntime && !hasLiveData && (
+        <div className="card p-6 text-center">
+          <Server className="mx-auto h-8 w-8 text-haven-text-tertiary" />
+          <p className="mt-3 text-sm font-semibold text-haven-text">Live data available in the desktop app</p>
+          <p className="mt-1 text-xs text-haven-text-secondary">
+            Network monitoring runs locally on your computer. Open the HavenAI desktop app to see active connections in real time.
+          </p>
+        </div>
+      )}
+
+      {!networkEnabled && isDesktopRuntime && (
         <div className="card p-6 text-center">
           <Wifi className="mx-auto h-8 w-8 text-haven-text-tertiary" />
           <p className="mt-3 text-sm text-haven-text-secondary">
