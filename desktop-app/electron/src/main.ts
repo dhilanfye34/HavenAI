@@ -580,17 +580,24 @@ function initPythonBridge(): void {
   });
 
   pythonBridge.on('device-unlinked', (data: any) => {
-    // Device fully unlinked — clear all local state
+    // Device fully unlinked — clear all account-scoped local state so a
+    // fresh account on this machine doesn't inherit email creds, monitor
+    // preferences, or session tokens.
     deleteFromStore('accessToken');
     deleteFromStore('refreshToken');
     store.delete('user');
     store.delete('deviceId');
+    store.delete('emailMonitor');
+    deleteFromStore('emailMonitorPassword');
     const resetDesired: MonitorDesired = { file: false, process: false, network: false };
     const resetState: MonitorStateMap = { file: 'off', process: 'off', network: 'off' };
     const resetBlockers: MonitorBlockers = { file: [], process: [], network: [] };
     store.set('monitorDesired', resetDesired);
     store.set('monitorState', resetState);
     store.set('monitorBlockers', resetBlockers);
+    // Setup was machine-scoped; keep setupCompleted but force the new user
+    // back through the welcome + setup flow.
+    store.set('setupSkipped', false);
     mainWindow?.webContents.send('device-unlinked', data);
   });
 
@@ -684,6 +691,82 @@ ipcMain.handle('clear-credentials', () => {
   store.delete('user');
   store.delete('deviceId');
   return true;
+});
+
+// App flags — per-install onboarding/setup tracking. Kept separate from
+// credentials so logout doesn't wipe them (machine-level state).
+ipcMain.handle('get-app-flags', () => {
+  return {
+    onboardedUsers: (store.get('onboardedUsers') as string[] | undefined) ?? [],
+    setupCompleted: Boolean(store.get('setupCompleted') ?? false),
+    setupSkipped: Boolean(store.get('setupSkipped') ?? false),
+  };
+});
+
+ipcMain.handle('set-app-flags', (_, patch: Record<string, unknown>) => {
+  if (patch && typeof patch === 'object') {
+    if (Array.isArray(patch.onboardedUsers)) {
+      // Store only unique, non-empty string ids.
+      const unique = Array.from(
+        new Set((patch.onboardedUsers as unknown[]).filter((x) => typeof x === 'string' && x)),
+      ) as string[];
+      store.set('onboardedUsers', unique);
+    }
+    if (typeof patch.setupCompleted === 'boolean') {
+      store.set('setupCompleted', patch.setupCompleted);
+    }
+    if (typeof patch.setupSkipped === 'boolean') {
+      store.set('setupSkipped', patch.setupSkipped);
+    }
+  }
+  return true;
+});
+
+// Dev/support nuclear option — wipe every HavenAI key and reload. Used by
+// the hidden "Hard reset" button in Settings, and at the tail end of
+// device-unlink to guarantee a clean slate.
+ipcMain.handle('hard-reset', async () => {
+  try {
+    pythonBridge?.send({ type: 'unlink_device' });
+  } catch {
+    // agent may already be dead; continue regardless
+  }
+  const keys = [
+    'accessToken',
+    'refreshToken',
+    'user',
+    'deviceId',
+    'onboardedUsers',
+    'setupCompleted',
+    'setupSkipped',
+    'monitorDesired',
+    'monitorState',
+    'monitorBlockers',
+    'emailMonitor',
+    'emailMonitorPassword',
+    'startOnBoot',
+  ];
+  for (const k of keys) {
+    try {
+      store.delete(k as any);
+    } catch {
+      /* ignore */
+    }
+  }
+  mainWindow?.webContents.reload();
+  return true;
+});
+
+// Open an external URL in the user's default browser. Used by the
+// device-linked-error banner's "Open web dashboard" button.
+ipcMain.handle('open-external', async (_, url: string) => {
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return false;
+  try {
+    await shell.openExternal(url);
+    return true;
+  } catch {
+    return false;
+  }
 });
 
 // Send message to Python agent
@@ -795,9 +878,22 @@ ipcMain.handle('configure-email-monitor', (_, payload) => {
 
 ipcMain.handle('disconnect-email-monitor', () => {
   store.delete('emailMonitor');
-  store.delete('emailMonitorPassword');
+  deleteFromStore('emailMonitorPassword');
   pythonBridge?.send({ type: 'disconnect_email' });
   return true;
+});
+
+// Expose the stored email monitor config (WITHOUT the password) so the
+// renderer can show "Connected to X" after a re-login without re-entering
+// credentials.
+ipcMain.handle('get-email-monitor-config', () => {
+  const saved = store.get('emailMonitor') as any;
+  if (!saved?.email) return null;
+  return {
+    email: saved.email,
+    imapHost: saved.imapHost,
+    imapPort: saved.imapPort,
+  };
 });
 
 ipcMain.handle('query-local-events', (_, params) => {

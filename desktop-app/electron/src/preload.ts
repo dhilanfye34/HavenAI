@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('havenai', {
   configureEmailMonitor: (payload: { email: string; password: string; imapHost: string; imapPort: number }) =>
     ipcRenderer.invoke('configure-email-monitor', payload),
   disconnectEmailMonitor: () => ipcRenderer.invoke('disconnect-email-monitor'),
+  getEmailMonitorConfig: () => ipcRenderer.invoke('get-email-monitor-config'),
   queryLocalEvents: (params: { kind?: string; since?: number; limit?: number }) =>
     ipcRenderer.invoke('query-local-events', params),
   queryLocalAlerts: (params: { since?: number; severityMin?: string; limit?: number }) =>
@@ -52,6 +53,16 @@ contextBridge.exposeInMainWorld('havenai', {
   getCredentials: () => ipcRenderer.invoke('get-credentials'),
   saveCredentials: (credentials: object) => ipcRenderer.invoke('save-credentials', credentials),
   clearCredentials: () => ipcRenderer.invoke('clear-credentials'),
+
+  // Per-install app flags (onboardedUsers, setupCompleted, setupSkipped)
+  getAppFlags: () => ipcRenderer.invoke('get-app-flags'),
+  setAppFlags: (patch: object) => ipcRenderer.invoke('set-app-flags', patch),
+
+  // Nuke everything (dev-only hard reset + part of unlink cleanup)
+  hardReset: () => ipcRenderer.invoke('hard-reset'),
+
+  // Open a URL in the user's default browser
+  openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
 
   // Event listeners
   onNewAlert: (callback: (alert: any) => void) => {
@@ -135,6 +146,18 @@ declare global {
       }>;
       saveCredentials: (credentials: object) => Promise<boolean>;
       clearCredentials: () => Promise<boolean>;
+      getAppFlags: () => Promise<{
+        onboardedUsers: string[];
+        setupCompleted: boolean;
+        setupSkipped: boolean;
+      }>;
+      setAppFlags: (patch: Partial<{
+        onboardedUsers: string[];
+        setupCompleted: boolean;
+        setupSkipped: boolean;
+      }>) => Promise<boolean>;
+      hardReset: () => Promise<boolean>;
+      openExternal: (url: string) => Promise<boolean>;
       onNewAlert: (callback: (alert: any) => void) => void;
       onAgentStatus: (callback: (status: any) => void) => void;
       onAgentAuth: (callback: (auth: any) => void) => void;
@@ -148,6 +171,7 @@ declare global {
       onLocalStats: (callback: (data: any) => void) => void;
       configureEmailMonitor: (payload: { email: string; password: string; imapHost: string; imapPort: number }) => Promise<boolean>;
       disconnectEmailMonitor: () => Promise<boolean>;
+      getEmailMonitorConfig: () => Promise<{ email: string; imapHost: string; imapPort: number } | null>;
       queryLocalEvents: (params: { kind?: string; since?: number; limit?: number }) => Promise<any>;
       queryLocalAlerts: (params: { since?: number; severityMin?: string; limit?: number }) => Promise<any>;
       getLocalStats: () => Promise<any>;

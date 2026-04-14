@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.models import User
+from app.dependencies import get_current_user
 from app.schemas import UserCreate, UserLogin, AuthResponse, UserResponse, TokenResponse, RefreshRequest
 from app.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
 from app.rate_limit import limiter
@@ -128,3 +129,10 @@ async def refresh_token(request: Request, body: RefreshRequest, db: Session = De
         access_token=new_access_token,
         refresh_token=new_refresh_token
     )
+
+
+@router.get("/me", response_model=UserResponse)
+async def me(user: User = Depends(get_current_user)):
+    """Return the current authenticated user. Used by the desktop app on
+    boot to validate a stored token before showing the dashboard."""
+    return UserResponse.model_validate(user)

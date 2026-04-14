@@ -164,6 +164,7 @@ export default function EmailPage() {
   const {
     preferences, isDesktopRuntime, runtimeStatus, alerts, chatSendMessage, safelist,
     emailConnection, setEmailConnected, setEmailDisconnected, setEmailTesting, setEmailError,
+    user,
   } = useDashboard();
 
   // Reconcile the locally-stored email connection state with the real agent
@@ -490,18 +491,18 @@ export default function EmailPage() {
       {/* Connected account info */}
       {isDesktopRuntime && isConnected && !showSetup && (
         <div className="card p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-500/10">
                 <CheckCircle2 className="h-5 w-5 text-green-500" />
               </div>
-              <div>
-                <p className="text-sm font-medium text-haven-text">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-haven-text truncate">
                   {emailConnection.email || 'Email account connected'}
                 </p>
                 <p className="text-xs text-haven-text-tertiary">
                   {emailConnection.providerName
-                    ? `${emailConnection.providerName} account`
+                    ? `${emailConnection.providerName} account \u00b7 scanning every 20s`
                     : 'Scanning inbox every 20 seconds'}
                 </p>
               </div>
@@ -513,6 +514,14 @@ export default function EmailPage() {
               Switch account
             </button>
           </div>
+          {user?.email && (
+            <div className="mt-3 border-t pt-3 text-[11px] text-haven-text-tertiary" style={{ borderColor: 'var(--haven-border)' }}>
+              Linked to your HavenAI account:{' '}
+              <span className="font-medium text-haven-text-secondary">
+                {user.full_name ? `${user.full_name} (${user.email})` : user.email}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

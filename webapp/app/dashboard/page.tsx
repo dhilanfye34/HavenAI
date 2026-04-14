@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -109,6 +109,66 @@ const NOISY_PROCESS_NAMES = new Set([
   'launchd', 'mdworker', 'mdworker_shared', 'mds', 'mds_stores',
   'cfprefsd', 'distnoted', 'trustd', 'secd', 'nsurlsessiond',
 ]);
+
+function SetupNagBanner() {
+  const [shouldShow, setShouldShow] = useState(false);
+
+  useEffect(() => {
+    const havenai = (window as any).havenai;
+    // Only desktop runtime tracks these flags.
+    if (!havenai?.getAppFlags) return;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const flags = await havenai.getAppFlags();
+        if (cancelled) return;
+        const ctrl = await havenai.getMonitorControlState?.();
+        const states = ctrl?.state ?? {};
+        const allRunning =
+          states.file === 'running' &&
+          states.process === 'running' &&
+          states.network === 'running';
+        setShouldShow(Boolean(flags?.setupSkipped) && !allRunning);
+      } catch {
+        /* ignore */
+      }
+    };
+    check();
+    const interval = window.setInterval(check, 8_000);
+    // Live update when monitor state changes
+    havenai.onMonitorState?.(check);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  if (!shouldShow) return null;
+
+  return (
+    <div className="card border border-amber-400/30 bg-amber-50 p-3 dark:bg-amber-500/10">
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+            Finish setup to turn on monitoring
+          </p>
+          <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-0.5">
+            HavenAI isn&apos;t watching yet. Resume setup to grant the permissions it needs.
+          </p>
+        </div>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('havenai-resume-setup'))}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-600"
+        >
+          Resume setup
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function isNoisyProcess(name?: string): boolean {
   if (!name) return true;
@@ -242,7 +302,8 @@ export default function HomePage() {
   }, [metrics, details, alerts, safelist]);
 
   // ─── Threat Highlights (top 3 flagged items) ───
-  const threatHighlights = useMemo(() => {
+  // Fresh highlights, computed every render from the current runtime state.
+  const liveThreatHighlights = useMemo(() => {
     const highlights: Array<{
       id: string;
       icon: typeof Eye;
@@ -312,6 +373,59 @@ export default function HomePage() {
 
     return highlights;
   }, [details, safelist]);
+
+  // Sticky layer: keep each threat on screen for ~5s after it drops out of
+  // the live feed, so a process that only runs for a fraction of a second
+  // doesn't flash on and off.
+  const STICKY_MS = 5_000;
+  type Highlight = (typeof liveThreatHighlights)[number];
+  const stickyRef = useRef<Map<string, { data: Highlight; lastSeenAt: number }>>(new Map());
+  const [stickyTick, setStickyTick] = useState(0);
+
+  useEffect(() => {
+    const now = Date.now();
+    for (const h of liveThreatHighlights) {
+      stickyRef.current.set(h.id, { data: h, lastSeenAt: now });
+    }
+    setStickyTick((v) => v + 1);
+  }, [liveThreatHighlights]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      let changed = false;
+      const expired: string[] = [];
+      stickyRef.current.forEach((entry, key) => {
+        if (now - entry.lastSeenAt > STICKY_MS) expired.push(key);
+      });
+      expired.forEach((key) => {
+        stickyRef.current.delete(key);
+        changed = true;
+      });
+      if (changed) setStickyTick((v) => v + 1);
+    }, 1_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const threatHighlights = useMemo(() => {
+    // Prefer the currently-live ordering (for top-3 priority), then pad from
+    // the sticky set for anything that just dropped out.
+    const seen = new Set<string>();
+    const result: Highlight[] = [];
+    liveThreatHighlights.forEach((h) => {
+      seen.add(h.id);
+      result.push(h);
+    });
+    stickyRef.current.forEach((entry) => {
+      if (!seen.has(entry.data.id)) {
+        result.push(entry.data);
+        seen.add(entry.data.id);
+      }
+    });
+    return result.slice(0, 3);
+    // stickyTick is intentionally a dep so the memo refreshes on sweep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveThreatHighlights, stickyTick]);
 
   // ─── Protection Area "top example" text ───
   const areaExamples = useMemo(() => {
@@ -431,6 +545,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <SetupNagBanner />
       {/* Connection banner */}
       <div className={`card p-4 border ${connectionTone}`}>
         <div className="flex items-start gap-3">

@@ -20,8 +20,10 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import ShieldLock from './components/ShieldLock';
 
-import LoginPage from './login/page';
+import LoginForm from './login/LoginForm';
 import DashboardPage from './dashboard/page';
+import SetupFlow from './setup/SetupFlow';
+import { useAppState } from './hooks/useAppState';
 
 // ── Onboarding (inline — no router needed) ──
 
@@ -118,13 +120,11 @@ function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
     if (step < ONBOARDING_STEPS.length - 1) {
       setStep(step + 1);
     } else {
-      localStorage.setItem('haven-onboarded', 'true');
       onComplete();
     }
   };
 
   const skip = () => {
-    localStorage.setItem('haven-onboarded', 'true');
     onComplete();
   };
 
@@ -219,47 +219,39 @@ function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 // ── Root page ──
 
 export default function HomePage() {
-  const [state, setState] = useState<'loading' | 'login' | 'onboarding' | 'dashboard'>('loading');
+  const app = useAppState();
 
-  useEffect(() => {
-    const computeState = () => {
-      const hasToken = Boolean(localStorage.getItem('access_token'));
-      if (!hasToken) return 'login' as const;
-      if (!localStorage.getItem('haven-onboarded')) return 'onboarding' as const;
-      return 'dashboard' as const;
-    };
-
-    const updateState = () => {
-      const next = computeState();
-      setState((prev) => (prev === next ? prev : next)); // only re-render on actual change
-    };
-
-    updateState();
-
-    // Poll as a fallback; storage event is the primary trigger
-    const timer = window.setInterval(updateState, 2000);
-    window.addEventListener('storage', updateState);
-    window.addEventListener('havenai-restart-onboarding', updateState);
-
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('storage', updateState);
-      window.removeEventListener('havenai-restart-onboarding', updateState);
-    };
-  }, []);
-
-  if (state === 'loading') {
+  if (app.state === 'booting') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-haven-bg">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-          <p className="text-sm text-haven-text-tertiary">Loading...</p>
+          <ShieldLock className="h-10 w-10 text-blue-500" />
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
         </div>
       </div>
     );
   }
 
-  if (state === 'login') return <LoginPage />;
-  if (state === 'onboarding') return <OnboardingFlow onComplete={() => setState('dashboard')} />;
+  if (app.state === 'login' || app.state === 'login-device-conflict') {
+    return (
+      <LoginForm
+        deviceConflictMessage={
+          app.state === 'login-device-conflict' ? app.deviceConflictMessage : null
+        }
+        onLoginSuccess={app.onLoginSuccess}
+      />
+    );
+  }
+
+  if (app.state === 'onboarding') {
+    return <OnboardingFlow onComplete={app.onOnboardingComplete} />;
+  }
+
+  if (app.state === 'setup') {
+    return <SetupFlow onFinish={app.onSetupFinished} onSkip={app.onSetupSkipped} />;
+  }
+
+  // dashboard OR offline-authenticated — both show the dashboard (offline just
+  // adds a yellow banner handled inside the dashboard layer).
   return <DashboardPage />;
 }

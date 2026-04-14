@@ -345,19 +345,38 @@ export function DashboardProvider({
     if (emailConnection.status === 'connected') return; // already know
     const emailAgent = agents.find((a) => a.id === 'EmailInboxAgent');
     if (emailAgent && emailAgent.status === 'active') {
-      setEmailConnection({
-        status: 'connected',
-        message: 'Connected (restored from previous session)',
-        email: '',
-        providerName: '',
-      });
-      // Also persist so it survives tab switches
-      localStorage.setItem('haven-email-connection', JSON.stringify({
-        status: 'connected',
-        message: 'Connected (restored from previous session)',
-        email: '',
-        providerName: '',
-      }));
+      // In desktop runtime, ask main for the actual stored email/provider
+      // so we can show "Connected to you@gmail.com" instead of a blank.
+      const populate = async (emailArg?: string, providerArg?: string) => {
+        const state: EmailConnectionState = {
+          status: 'connected',
+          message: emailArg ? 'Connected' : 'Connected (restored from previous session)',
+          email: emailArg || '',
+          providerName: providerArg || '',
+        };
+        setEmailConnection(state);
+        localStorage.setItem('haven-email-connection', JSON.stringify(state));
+      };
+
+      const havenai = (window as any).havenai;
+      if (havenai?.getEmailMonitorConfig) {
+        havenai.getEmailMonitorConfig().then((cfg: any) => {
+          if (!cfg?.email) return populate();
+          const host = (cfg.imapHost || '').toLowerCase();
+          const provider = host.includes('gmail')
+            ? 'Google'
+            : host.includes('outlook') || host.includes('office365')
+            ? 'Microsoft'
+            : host.includes('yahoo')
+            ? 'Yahoo'
+            : host.includes('me.com') || host.includes('icloud')
+            ? 'Apple'
+            : '';
+          populate(cfg.email, provider);
+        });
+      } else {
+        populate();
+      }
     }
   }, [agents, emailConnection.status]);
 
@@ -705,6 +724,17 @@ export function DashboardProvider({
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
     localStorage.removeItem('haven-email-connection');
+
+    // Desktop: stay inside the state machine — hard-navigating to /login
+    // escapes it and leaves a white page. Dispatch an event the root hook
+    // listens for instead.
+    if (typeof window !== 'undefined' && (window as any).havenai) {
+      const havenai = (window as any).havenai;
+      havenai?.logoutAgent?.();
+      havenai?.clearCredentials?.();
+      window.dispatchEvent(new CustomEvent('havenai-logout'));
+      return;
+    }
     window.location.href = '/login';
   };
 

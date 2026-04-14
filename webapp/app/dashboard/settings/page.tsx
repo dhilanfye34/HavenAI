@@ -167,12 +167,18 @@ export default function SettingsPage() {
     }
 
     if (isDesktopRuntime) {
-      // Desktop: use IPC to unlink and logout
+      // Desktop: trigger unlink via IPC and let the root state machine
+      // handle the transition when the `device-unlinked` event arrives.
+      // Do NOT call logout() here — logout navigates window.location to
+      // /login which escapes the state machine and leaves a white page.
       const havenai = (window as any).havenai;
       if (havenai?.unlinkDevice) {
+        try {
+          localStorage.removeItem('haven-email-connection');
+        } catch {
+          /* ignore */
+        }
         await havenai.unlinkDevice();
-        // The device-unlinked event will clear credentials and redirect
-        logout();
       }
     } else {
       // Webapp: call API directly
@@ -382,8 +388,10 @@ export default function SettingsPage() {
           <div className="py-4">
             <button
               onClick={() => {
-                localStorage.removeItem('haven-onboarded');
-                window.dispatchEvent(new CustomEvent('havenai-restart-onboarding'));
+                // No persisted flag change — just nudge the root state
+                // machine to replay the walkthrough. Returns to dashboard
+                // on completion without touching onboardedUsers.
+                window.dispatchEvent(new CustomEvent('havenai-replay-onboarding'));
               }}
               className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-blue-500 transition hover:bg-blue-50 dark:hover:bg-blue-500/10"
             >
@@ -392,6 +400,34 @@ export default function SettingsPage() {
             </button>
             <p className="mt-1 pl-1 text-xs text-haven-text-tertiary">
               Replays the intro tour. You\u2019ll land back on Home when you finish.
+            </p>
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Dev-only hard reset — only visible in unpackaged dev builds. */}
+      {isDesktopRuntime && typeof window !== 'undefined' && !(window as any).havenai?.isPackaged && (
+        <SectionCard title="Developer">
+          <div className="py-4">
+            <button
+              onClick={async () => {
+                if (!confirm('Hard reset will unlink this device, wipe all local HavenAI data, and reload the app. Continue?')) return;
+                const havenai = (window as any).havenai;
+                try {
+                  await havenai?.hardReset?.();
+                } catch {
+                  /* reloads regardless */
+                }
+                try { localStorage.clear(); } catch { /* ignore */ }
+                window.location.reload();
+              }}
+              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-red-500 transition hover:bg-red-50 dark:hover:bg-red-500/10"
+            >
+              <Link2Off className="h-4 w-4" />
+              Hard reset (dev only)
+            </button>
+            <p className="mt-1 pl-1 text-xs text-haven-text-tertiary">
+              Unlinks the device, wipes all HavenAI state on this machine, reloads to the login screen.
             </p>
           </div>
         </SectionCard>
