@@ -389,7 +389,7 @@ function createTray(): void {
 function getIconPath(): string {
   const iconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
   if (isDev) {
-    return path.join(__dirname, '../../assets', iconName);
+    return path.join(__dirname, '../assets', iconName);
   }
   return path.join(process.resourcesPath, 'assets', iconName);
 }
@@ -401,7 +401,7 @@ function getTrayIconPath(): string {
   // Use a template image on Mac for proper dark/light mode support
   const iconName = process.platform === 'darwin' ? 'trayTemplate.png' : 'tray.png';
   if (isDev) {
-    return path.join(__dirname, '../../assets', iconName);
+    return path.join(__dirname, '../assets', iconName);
   }
   return path.join(process.resourcesPath, 'assets', iconName);
 }
@@ -602,6 +602,16 @@ function initPythonBridge(): void {
   pythonBridge.on('exit', (code: number) => {
     console.log('Python agent exited with code:', code);
     mainWindow?.webContents.send('agent-status', { status: 'stopped', code });
+  });
+
+  pythonBridge.on('unresponsive', (silenceMs: number) => {
+    console.warn(`Python agent unresponsive (silent ${silenceMs}ms)`);
+    mainWindow?.webContents.send('agent-status', { status: 'unresponsive', silenceMs });
+  });
+
+  pythonBridge.on('responsive', () => {
+    console.log('Python agent responsive again');
+    mainWindow?.webContents.send('agent-status', { status: 'running' });
   });
 
   // Start the Python agent
@@ -914,6 +924,13 @@ function setupAutoUpdater(): void {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin' && app.dock) {
+    try {
+      app.dock.setIcon(getIconPath());
+    } catch {
+      // Non-fatal: dock icon is cosmetic
+    }
+  }
   createWindow();
   createTray();
   initPythonBridge();

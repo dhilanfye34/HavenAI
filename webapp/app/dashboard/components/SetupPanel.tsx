@@ -50,6 +50,59 @@ interface SetupPanelProps {
   isDesktopRuntime?: boolean;
 }
 
+type BlockerResult = 'ok' | 'still-blocked' | 'error' | null;
+
+interface BlockerActionsProps {
+  module: 'file' | 'process' | 'network';
+  opened?: boolean;
+  rechecking?: boolean;
+  result: BlockerResult;
+  onOpen: () => void;
+  onRecheck: () => void;
+}
+
+function BlockerActions({ module, opened, rechecking, result, onOpen, onRecheck }: BlockerActionsProps) {
+  const prettyName = module === 'file' ? 'File' : module === 'process' ? 'Process' : 'Network';
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onOpen}
+          disabled={rechecking}
+          className="rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-2.5 py-1.5 text-xs text-amber-300 transition hover:bg-amber-500/10 disabled:opacity-60"
+        >
+          {opened ? 'Open privacy settings again' : '1. Open privacy settings'}
+        </button>
+        <button
+          type="button"
+          onClick={onRecheck}
+          disabled={rechecking}
+          className="rounded-lg border border-cyan-400/20 bg-cyan-500/[0.06] px-2.5 py-1.5 text-xs text-cyan-300 transition hover:bg-cyan-500/10 disabled:opacity-60 disabled:cursor-wait"
+        >
+          {rechecking ? 'Checking…' : opened ? '2. I\u2019ve granted access — check again' : 'I\u2019ve already granted access — check'}
+        </button>
+      </div>
+      {!rechecking && result === 'still-blocked' && (
+        <p className="text-[11px] text-amber-300/90">
+          Still blocked. In System Settings → Privacy & Security → Full Disk Access, make sure
+          HavenAI is toggled on. macOS sometimes needs a moment to apply it.
+        </p>
+      )}
+      {!rechecking && result === 'error' && (
+        <p className="text-[11px] text-red-300/90">
+          Couldn\u2019t re-check permissions — try again in a second.
+        </p>
+      )}
+      {!rechecking && result === 'ok' && (
+        <p className="text-[11px] text-emerald-300/90">
+          Access granted. {prettyName} monitoring is starting up.
+        </p>
+      )}
+    </div>
+  );
+}
+
 interface ToggleRowProps {
   label: string;
   description: string;
@@ -178,6 +231,12 @@ export function SetupPanel({
   const [manualImapPort, setManualImapPort] = useState('993');
   const [emailTestStatus, setEmailTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [emailTestMessage, setEmailTestMessage] = useState('');
+  const [permissionsOpenedFor, setPermissionsOpenedFor] = useState<Record<string, boolean>>({});
+  const [recheckingModule, setRecheckingModule] =
+    useState<'file' | 'process' | 'network' | null>(null);
+  const [recheckResult, setRecheckResult] = useState<
+    Record<'file' | 'process' | 'network', 'ok' | 'still-blocked' | 'error' | null>
+  >({ file: null, process: null, network: null });
   const detectedProvider = detectProvider(emailAddress);
 
   useEffect(() => {
@@ -213,20 +272,36 @@ export function SetupPanel({
     recentAlerts.filter((a) => a.source.includes('Network')).length;
   const openPermissionsSettings = (target: 'file' | 'process' | 'network' | 'alerts' | 'all') => {
     (window as any).havenai?.openPermissionsSettings?.(target);
+    // Remember that the user opened settings for this module so we can
+    // surface a clearer "I've granted access — check again" action.
+    setPermissionsOpenedFor((prev) => ({ ...prev, [target]: true }));
   };
-  const allowAccessAndRetry = async (module: 'file' | 'process' | 'network') => {
+
+  const recheckPermission = async (module: 'file' | 'process' | 'network') => {
     const havenai = (window as any).havenai;
-    openPermissionsSettings(module);
-    await havenai?.grantMonitorPermission?.(module);
-    if (module === 'file') {
-      await onSave({ file_monitoring_enabled: true });
-      return;
+    setRecheckingModule(module);
+    setRecheckResult((prev) => ({ ...prev, [module]: null }));
+    try {
+      const result = await havenai?.grantMonitorPermission?.(module);
+      // If the module came back as 'running', great — save the toggle on.
+      const stateField =
+        module === 'file'
+          ? 'file_monitoring_enabled'
+          : module === 'process'
+          ? 'process_monitoring_enabled'
+          : 'network_monitoring_enabled';
+      const nextState = result?.state?.[module] as MonitorLifecycleState | undefined;
+      if (nextState === 'running' || nextState === 'pending_permission') {
+        await onSave({ [stateField]: true } as SetupPreferencesUpdate);
+        setRecheckResult((prev) => ({ ...prev, [module]: 'ok' }));
+      } else {
+        setRecheckResult((prev) => ({ ...prev, [module]: 'still-blocked' }));
+      }
+    } catch {
+      setRecheckResult((prev) => ({ ...prev, [module]: 'error' }));
+    } finally {
+      setRecheckingModule(null);
     }
-    if (module === 'process') {
-      await onSave({ process_monitoring_enabled: true });
-      return;
-    }
-    await onSave({ network_monitoring_enabled: true });
   };
 
   const fileState = monitorControl?.state.file ?? (preferences.file_monitoring_enabled ? 'running' : 'off');
@@ -286,13 +361,26 @@ export function SetupPanel({
       imapPort,
     });
 
+    // Timeout if the agent never responds (e.g., agent crashed, network hung).
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      havenai.removeAllListeners?.('email-config-result');
+      setEmailTestStatus('error');
+      setEmailTestMessage('Timed out after 25s. Check your password and server settings, then try again.');
+    }, 25_000);
+
     havenai.onEmailConfigResult?.((result: any) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
       if (result?.success) {
         setEmailTestStatus('success');
         setEmailTestMessage(result.message || 'Connected successfully!');
       } else {
         setEmailTestStatus('error');
-        setEmailTestMessage(result?.message || 'Connection failed.');
+        setEmailTestMessage(result?.message || 'Connection failed. Double-check the app password.');
       }
       havenai.removeAllListeners?.('email-config-result');
     });
@@ -347,22 +435,14 @@ export function SetupPanel({
           onToggle={(checked) => onSave({ file_monitoring_enabled: checked })}
         />
         {fileState === 'blocked' && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => openPermissionsSettings('file')}
-              className="rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-2.5 py-1.5 text-xs text-amber-300 transition hover:bg-amber-500/10"
-            >
-              Open privacy settings
-            </button>
-            <button
-              type="button"
-              onClick={() => allowAccessAndRetry('file')}
-              className="rounded-lg border border-cyan-400/20 bg-cyan-500/[0.06] px-2.5 py-1.5 text-xs text-cyan-300 transition hover:bg-cyan-500/10"
-            >
-              Allow access and retry
-            </button>
-          </div>
+          <BlockerActions
+            module="file"
+            opened={permissionsOpenedFor.file}
+            rechecking={recheckingModule === 'file'}
+            result={recheckResult.file}
+            onOpen={() => openPermissionsSettings('file')}
+            onRecheck={() => recheckPermission('file')}
+          />
         )}
         <ToggleRow
           label={`Process Monitoring (${processEvents} recent events)`}
@@ -375,22 +455,14 @@ export function SetupPanel({
           onToggle={(checked) => onSave({ process_monitoring_enabled: checked })}
         />
         {processState === 'blocked' && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => openPermissionsSettings('process')}
-              className="rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-2.5 py-1.5 text-xs text-amber-300 transition hover:bg-amber-500/10"
-            >
-              Open privacy settings
-            </button>
-            <button
-              type="button"
-              onClick={() => allowAccessAndRetry('process')}
-              className="rounded-lg border border-cyan-400/20 bg-cyan-500/[0.06] px-2.5 py-1.5 text-xs text-cyan-300 transition hover:bg-cyan-500/10"
-            >
-              Allow access and retry
-            </button>
-          </div>
+          <BlockerActions
+            module="process"
+            opened={permissionsOpenedFor.process}
+            rechecking={recheckingModule === 'process'}
+            result={recheckResult.process}
+            onOpen={() => openPermissionsSettings('process')}
+            onRecheck={() => recheckPermission('process')}
+          />
         )}
         <ToggleRow
           label={`Network Monitoring (${networkEvents} recent events)`}
@@ -408,22 +480,14 @@ export function SetupPanel({
           </div>
         )}
         {networkState === 'blocked' && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => openPermissionsSettings('network')}
-              className="rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-2.5 py-1.5 text-xs text-amber-300 transition hover:bg-amber-500/10"
-            >
-              Open privacy settings
-            </button>
-            <button
-              type="button"
-              onClick={() => allowAccessAndRetry('network')}
-              className="rounded-lg border border-cyan-400/20 bg-cyan-500/[0.06] px-2.5 py-1.5 text-xs text-cyan-300 transition hover:bg-cyan-500/10"
-            >
-              Allow access and retry
-            </button>
-          </div>
+          <BlockerActions
+            module="network"
+            opened={permissionsOpenedFor.network}
+            rechecking={recheckingModule === 'network'}
+            result={recheckResult.network}
+            onOpen={() => openPermissionsSettings('network')}
+            onRecheck={() => recheckPermission('network')}
+          />
         )}
       </div>
 

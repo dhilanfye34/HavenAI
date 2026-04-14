@@ -159,8 +159,11 @@ class ProcessAgent(Agent):
         
         for proc in observation["new_processes"]:
             risk_score, reasons = self._analyze_process(proc)
-            
-            if risk_score > 0.5:
+
+            # Require meaningful evidence before alerting — a single weak
+            # indicator (like "process name looks random") shouldn't trigger
+            # a notification for normal users running dev tools, installers, etc.
+            if risk_score >= 0.7:
                 findings.append({
                     "process": proc,
                     "risk_score": risk_score,
@@ -225,15 +228,14 @@ class ProcessAgent(Agent):
             proc = finding["process"]
             risk = finding["risk_score"]
             
-            # Determine severity
+            # Determine severity — matched to the stricter alert threshold
+            # above (>=0.7 to even surface as a finding).
             if risk >= 0.9:
                 severity = "critical"
-            elif risk >= 0.7:
+            elif risk >= 0.8:
                 severity = "high"
-            elif risk >= 0.5:
-                severity = "medium"
             else:
-                severity = "low"
+                severity = "medium"
             
             self.send_alert({
                 "type": "suspicious_process",

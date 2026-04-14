@@ -1,6 +1,6 @@
 {
   "name": "havenai",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "AI-powered personal cybersecurity agent",
   "main": "dist/main.js",
   "author": "HavenAI Team",
@@ -46,7 +46,7 @@
     ],
     "mac": {
       "category": "public.app-category.utilities",
-      "icon": "assets/icon.icns",
+      "icon": "assets/icon.png",
       "target": [
         "dmg",
         "zip"
@@ -56,7 +56,7 @@
       "entitlementsInherit": "entitlements.mac.plist"
     },
     "win": {
-      "icon": "assets/icon.ico",
+      "icon": "assets/icon.png",
       "target": [
         "nsis",
         "portable"

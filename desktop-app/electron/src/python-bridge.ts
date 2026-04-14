@@ -14,6 +14,9 @@ import { app } from 'electron';
 export class PythonBridge extends EventEmitter {
   private process: ChildProcess | null = null;
   private buffer: string = '';
+  private lastMessageAt: number = 0;
+  private livenessTimer: ReturnType<typeof setInterval> | null = null;
+  private unresponsiveFired: boolean = false;
 
   constructor() {
     super();
@@ -143,8 +146,32 @@ export class PythonBridge extends EventEmitter {
     this.process.on('exit', (code) => {
       console.log(`Python agent exited with code ${code}`);
       this.process = null;
+      if (this.livenessTimer) {
+        clearInterval(this.livenessTimer);
+        this.livenessTimer = null;
+      }
       this.emit('exit', code);
     });
+
+    // Liveness watchdog: if we haven't heard from the agent in 35s, flag it
+    // as unresponsive. Coordinator pings every 10s, so 35s means we missed
+    // three pings in a row.
+    this.lastMessageAt = Date.now();
+    this.unresponsiveFired = false;
+    if (this.livenessTimer) clearInterval(this.livenessTimer);
+    this.livenessTimer = setInterval(() => {
+      if (!this.process) return;
+      const silenceMs = Date.now() - this.lastMessageAt;
+      if (silenceMs > 35_000 && !this.unresponsiveFired) {
+        this.unresponsiveFired = true;
+        console.warn(`Python agent silent for ${Math.round(silenceMs / 1000)}s — marking unresponsive`);
+        this.emit('unresponsive', silenceMs);
+      } else if (silenceMs < 20_000 && this.unresponsiveFired) {
+        // Recovered — agent started talking again.
+        this.unresponsiveFired = false;
+        this.emit('responsive');
+      }
+    }, 5_000);
 
     // Handle process errors
     this.process.on('error', (error) => {
@@ -163,6 +190,11 @@ export class PythonBridge extends EventEmitter {
 
     // Send stop command
     this.send({ type: 'stop' });
+
+    if (this.livenessTimer) {
+      clearInterval(this.livenessTimer);
+      this.livenessTimer = null;
+    }
 
     // Give it a moment to clean up, then force kill
     setTimeout(() => {
@@ -227,10 +259,15 @@ export class PythonBridge extends EventEmitter {
    */
   private handleMessage(message: any): void {
     const { type, data } = message;
+    // Every message counts as a liveness signal.
+    this.lastMessageAt = Date.now();
 
     switch (type) {
       case 'ready':
         this.emit('ready');
+        break;
+      case 'alive':
+        // Dedicated liveness ping — already bumped lastMessageAt above.
         break;
       case 'alert':
         this.emit('alert', data);

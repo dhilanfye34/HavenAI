@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import '../../../../webapp/app/globals.css';
 import './globals.css';
+import ErrorBoundary from './components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'HavenAI - Personal Cybersecurity',
@@ -14,7 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </body>
     </html>
   );
 }

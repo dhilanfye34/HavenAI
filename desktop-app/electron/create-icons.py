@@ -1,141 +1,100 @@
 #!/usr/bin/env python3
 """
-Generate HavenAI desktop app icons.
+Generate HavenAI desktop app icons from the website's ShieldLock SVG.
 
-Draws the same shield-with-lock mark used on the website (ShieldLock.tsx)
-and exports:
+Renders the exact same shield-with-lock mark used on the website
+(webapp/app/icon.svg) as a crisp vector, and exports:
   - assets/icon.png         512x512, app icon (electron-builder derives .icns/.ico from this)
   - assets/tray.png         32x32,  menubar/tray icon (colored)
-  - assets/trayTemplate.png 32x32,  macOS template (white/transparent for dark/light menu bars)
+  - assets/trayTemplate.png 32x32,  macOS template (black/transparent for menu bars)
+
+Requires: cairosvg, pillow  (pip install cairosvg pillow)
 """
 
-from PIL import Image, ImageDraw
+import io
 import os
 
+import cairosvg
+from PIL import Image, ImageDraw
 
-# Match the gradient palette used on the website (violet → blue).
-BG_TOP = (99, 102, 241)        # indigo-500
-BG_BOT = (59, 130, 246)        # blue-500
-FG = (255, 255, 255)           # shield + lock stroke
+
+# Match the gradient palette used on the website (violet -> blue).
+BG_TOP = (99, 102, 241)   # indigo-500
+BG_BOT = (59, 130, 246)   # blue-500
 
 
 def _lerp(a, b, t):
     return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
-def _rounded_rect_background(size: int) -> Image.Image:
-    """Square background with a vertical indigo→blue gradient and rounded corners."""
+def _rounded_gradient_bg(size: int) -> Image.Image:
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     for y in range(size):
         t = y / max(size - 1, 1)
         draw.line([(0, y), (size, y)], fill=_lerp(BG_TOP, BG_BOT, t))
-    # Rounded corner mask
     mask = Image.new("L", (size, size), 0)
-    mdraw = ImageDraw.Draw(mask)
-    radius = int(size * 0.22)
-    mdraw.rounded_rectangle((0, 0, size - 1, size - 1), radius=radius, fill=255)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        (0, 0, size - 1, size - 1), radius=int(size * 0.22), fill=255
+    )
     img.putalpha(mask)
     return img
 
 
-def _shield_with_lock(size: int, fg=FG, with_background=True) -> Image.Image:
+# The website mark: identical paths to webapp/app/icon.svg and ShieldLock.tsx.
+# Stroke color is a variable so we can render white-on-gradient, or black
+# for the macOS tray template.
+SHIELD_SVG = """<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{stroke}" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+  <rect x="9.5" y="11" width="5" height="4" rx="0.5"/>
+  <path d="M10.5 11V9.5a1.5 1.5 0 0 1 3 0V11"/>
+</svg>"""
+
+
+def _render_shield(size: int, stroke: str, inset_ratio: float, sw: float) -> Image.Image:
+    """Render the shield SVG into an RGBA image of (size x size), centered,
+    with the glyph occupying the inner region defined by `inset_ratio`.
     """
-    Draw a shield + padlock, matching the web ShieldLock.tsx mark.
+    inner = int(size * inset_ratio)
+    svg = SHIELD_SVG.format(size=inner, stroke=stroke, sw=sw)
+    png_bytes = cairosvg.svg2png(bytestring=svg.encode("utf-8"),
+                                 output_width=inner, output_height=inner)
+    glyph = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
 
-    The shield path is based on the lucide Shield glyph (a 24x24 viewBox),
-    rescaled to the target size. For simplicity we approximate the curved
-    shield with a polygon — at 512px the difference is imperceptible.
-    """
-    if with_background:
-        img = _rounded_rect_background(size)
-    else:
-        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    s = size
-
-    # Geometry in 24x24 viewBox → scaled to `s`
-    def p(x, y):
-        return (x / 24 * s, y / 24 * s)
-
-    # Stroke width (mirrors strokeWidth=1.5 on a 24-unit viewBox, but beefier
-    # for a standalone app icon so it reads at small sizes).
-    stroke = max(2, int(s * 0.045))
-
-    # Shield outline — 24-point polygon approximating the lucide path
-    shield_pts = [
-        p(12, 2.1),
-        p(14, 3.0), p(16, 3.9), p(18, 4.6), p(19.7, 5.0),
-        p(20, 6),
-        p(20, 9), p(20, 11), p(19.95, 13),
-        p(19.6, 14.8), p(18.9, 16.3), p(17.8, 17.6),
-        p(16.3, 18.8), p(14.4, 19.9), p(12.3, 20.9),
-        p(12, 21.0),
-        p(11.7, 20.9), p(9.6, 19.9), p(7.7, 18.8),
-        p(6.2, 17.6), p(5.1, 16.3), p(4.4, 14.8),
-        p(4.05, 13), p(4, 11), p(4, 9), p(4, 6),
-        p(5, 5),
-        p(6.3, 4.9), p(8.0, 4.4), p(10, 3.5),
-    ]
-    # Draw filled shield stroke
-    draw.polygon(shield_pts, outline=fg, fill=None)
-    # Re-draw the outline several times for a thicker stroke
-    for dx in range(-stroke // 2, stroke // 2 + 1):
-        for dy in range(-stroke // 2, stroke // 2 + 1):
-            if dx * dx + dy * dy <= (stroke / 2) ** 2:
-                draw.polygon(
-                    [(x + dx, y + dy) for (x, y) in shield_pts],
-                    outline=fg,
-                    fill=None,
-                )
-
-    # Lock body — rect(9.5, 11, 5, 4) in the 24 viewBox
-    body_l, body_t = p(9.5, 11)
-    body_r, body_b = p(14.5, 15)
-    body_r_px = max(1, int(s * 0.01))
-    draw.rounded_rectangle(
-        (body_l, body_t, body_r, body_b),
-        radius=body_r_px + int(s * 0.008),
-        outline=fg,
-        width=stroke,
-    )
-
-    # Lock shackle — arc from (10.5,11) up to (13.5,11) curving to y≈9.5
-    shackle_l, shackle_t = p(10.5, 9.5)
-    shackle_r, shackle_b = p(13.5, 11.5)
-    draw.arc(
-        (shackle_l, shackle_t, shackle_r, shackle_b),
-        start=180,
-        end=360,
-        fill=fg,
-        width=stroke,
-    )
-
-    return img
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    off = (size - inner) // 2
+    canvas.alpha_composite(glyph, (off, off))
+    return canvas
 
 
 def main():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    assets_dir = os.path.join(script_dir, "assets")
-    os.makedirs(assets_dir, exist_ok=True)
+    here = os.path.dirname(os.path.abspath(__file__))
+    assets = os.path.join(here, "assets")
+    os.makedirs(assets, exist_ok=True)
 
-    # 1) Main app icon — 512x512 with gradient background
-    icon_path = os.path.join(assets_dir, "icon.png")
-    _shield_with_lock(512, fg=FG, with_background=True).save(icon_path)
+    # 1) Main app icon: 512x512, white shield on indigo/blue gradient.
+    bg = _rounded_gradient_bg(512)
+    shield = _render_shield(512, stroke="#ffffff", inset_ratio=0.70, sw=1.6)
+    bg.alpha_composite(shield)
+    icon_path = os.path.join(assets, "icon.png")
+    bg.save(icon_path)
     print(f"Created: {icon_path}")
 
-    # 2) Tray icon — 32x32 colored (for platforms that don't use templates)
-    tray_path = os.path.join(assets_dir, "tray.png")
-    _shield_with_lock(32, fg=FG, with_background=True).save(tray_path)
+    # 2) Tray icon (colored): 32x32, same gradient + white glyph.
+    bg_tray = _rounded_gradient_bg(32)
+    shield_tray = _render_shield(32, stroke="#ffffff", inset_ratio=0.72, sw=2.2)
+    bg_tray.alpha_composite(shield_tray)
+    tray_path = os.path.join(assets, "tray.png")
+    bg_tray.save(tray_path)
     print(f"Created: {tray_path}")
 
-    # 3) Tray template for macOS — white glyph on transparent bg, no background
-    tray_template_path = os.path.join(assets_dir, "trayTemplate.png")
-    _shield_with_lock(32, fg=(0, 0, 0), with_background=False).save(tray_template_path)
-    print(f"Created: {tray_template_path}")
+    # 3) Tray template (macOS): 32x32, black glyph on transparent (no bg).
+    tray_tpl = _render_shield(32, stroke="#000000", inset_ratio=0.82, sw=2.0)
+    tpl_path = os.path.join(assets, "trayTemplate.png")
+    tray_tpl.save(tpl_path)
+    print(f"Created: {tpl_path}")
 
-    print("\nIcons generated from the ShieldLock mark.")
+    print("\nIcons generated from the website ShieldLock SVG.")
 
 
 if __name__ == "__main__":

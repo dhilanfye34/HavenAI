@@ -195,7 +195,10 @@ class EmailInboxAgent(Agent):
             subject = email_msg.get("subject", "(no subject)")[:50]
             logger.info(f"Email scored: {risk_score:.2f} — \"{subject}\" from {email_msg.get('from_email', '?')}")
 
-            if risk_score >= 0.3:  # Lower threshold — flag anything mildly suspicious
+            # Threshold raised to 0.5 — common legit emails (Google security
+            # notices, receipts, promos) routinely hit 2–3 weak keywords and
+            # were flooding the inbox view with false positives.
+            if risk_score >= 0.5:
                 findings.append(
                     {
                         "email": email_msg,

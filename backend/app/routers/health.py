@@ -30,5 +30,5 @@ async def database_health(db: Session = Depends(get_db)):
         # Execute a simple query
         db.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected"}
-    except Exception as e:
-        return {"status": "error", "database": "disconnected", "error": str(e)}
+    except Exception:
+        return {"status": "error", "database": "disconnected"}

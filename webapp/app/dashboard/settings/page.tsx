@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   Bell,
+  Compass,
   Eye,
   FileSearch,
   Link2Off,
@@ -374,6 +375,27 @@ export default function SettingsPage() {
           </SettingRow>
         )}
       </SectionCard>
+
+      {/* Help */}
+      {isDesktopRuntime && (
+        <SectionCard title="Help">
+          <div className="py-4">
+            <button
+              onClick={() => {
+                localStorage.removeItem('haven-onboarded');
+                window.dispatchEvent(new CustomEvent('havenai-restart-onboarding'));
+              }}
+              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-blue-500 transition hover:bg-blue-50 dark:hover:bg-blue-500/10"
+            >
+              <Compass className="h-4 w-4" />
+              Take the walkthrough again
+            </button>
+            <p className="mt-1 pl-1 text-xs text-haven-text-tertiary">
+              Replays the intro tour. You\u2019ll land back on Home when you finish.
+            </p>
+          </div>
+        </SectionCard>
+      )}
 
       {/* Account */}
       <SectionCard title="Account">

@@ -76,6 +76,14 @@ class LocalDB:
     def __init__(self, db_path: Optional[str] = None):
         path = Path(db_path) if db_path else _DB_PATH
         path.parent.mkdir(parents=True, exist_ok=True)
+        # Restrict directory + file to owner-only (rwx------ / rw-------)
+        # so other users on the same Mac can't read monitoring data.
+        try:
+            path.parent.chmod(0o700)
+            if path.exists():
+                path.chmod(0o600)
+        except OSError:
+            pass  # Best-effort; may fail on some filesystems
         self._path = str(path)
         self._init_schema()
 

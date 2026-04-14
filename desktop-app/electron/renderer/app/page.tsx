@@ -239,10 +239,12 @@ export default function HomePage() {
     // Poll as a fallback; storage event is the primary trigger
     const timer = window.setInterval(updateState, 2000);
     window.addEventListener('storage', updateState);
+    window.addEventListener('havenai-restart-onboarding', updateState);
 
     return () => {
       window.clearInterval(timer);
       window.removeEventListener('storage', updateState);
+      window.removeEventListener('havenai-restart-onboarding', updateState);
     };
   }, []);
 

@@ -588,10 +588,9 @@ async def stream_chat(
         except APIStatusError as status_error:
             logger.exception("OpenAI API status error")
             yield f"data: {json.dumps({'type': 'error', 'message': f'OpenAI API error ({status_error.status_code}).'})}\n\n"
-        except Exception as error:
+        except Exception:
             logger.exception("Chat stream failed")
-            message = str(error).strip() or "Chat stream failed."
-            yield f"data: {json.dumps({'type': 'error', 'message': message[:300]})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Chat stream failed. Please try again.'})}\n\n"
 
     return StreamingResponse(
         event_stream(),

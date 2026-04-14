@@ -20,6 +20,8 @@ export interface ConnectionStatus {
   label: string;
   detail: string;
   recheck: () => void;
+  isRechecking: boolean;
+  lastRecheckAt: number | null;
 }
 
 // Agent heartbeats every 60s; backend marks devices offline after 3 min.
@@ -51,7 +53,10 @@ export function useConnectionStatus({
   );
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [hasChecked, setHasChecked] = useState(false);
+  const [isRechecking, setIsRechecking] = useState(false);
+  const [lastRecheckAt, setLastRecheckAt] = useState<number | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setIsDesktopRuntime(Boolean((window as any).havenai));
@@ -126,14 +131,43 @@ export function useConnectionStatus({
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [isDesktopRuntime, token, fetchConnection]);
 
-  const recheck = useCallback(() => {
+  const recheck = useCallback(async () => {
+    if (recheckTimeoutRef.current) clearTimeout(recheckTimeoutRef.current);
+    setIsRechecking(true);
     setNowTick(Date.now());
-    if (isDesktopRuntime) {
-      (window as any).havenai?.sendToAgent?.({ type: 'get_status' });
-    } else {
-      fetchConnection();
+    const startedAt = Date.now();
+    try {
+      if (isDesktopRuntime) {
+        (window as any).havenai?.sendToAgent?.({ type: 'get_status' });
+        // No awaitable response — give the agent a moment, then settle.
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      } else {
+        await fetchConnection();
+      }
+    } finally {
+      // Keep the spinner visible at least 500ms so the click feels responsive.
+      const elapsed = Date.now() - startedAt;
+      const remaining = Math.max(0, 500 - elapsed);
+      recheckTimeoutRef.current = setTimeout(() => {
+        setIsRechecking(false);
+        setLastRecheckAt(Date.now());
+      }, remaining);
     }
   }, [isDesktopRuntime, fetchConnection]);
+
+  useEffect(() => {
+    return () => {
+      if (recheckTimeoutRef.current) clearTimeout(recheckTimeoutRef.current);
+    };
+  }, []);
+
+  // After a recheck settles, force a re-render ~2.6s later so the "Checked"
+  // badge clears itself without waiting for the next poll tick.
+  useEffect(() => {
+    if (!lastRecheckAt) return;
+    const id = setTimeout(() => setNowTick(Date.now()), 2600);
+    return () => clearTimeout(id);
+  }, [lastRecheckAt]);
 
   return useMemo<ConnectionStatus>(() => {
     // ── Desktop runtime path ──
@@ -177,6 +211,8 @@ export function useConnectionStatus({
         label,
         detail,
         recheck,
+        isRechecking,
+        lastRecheckAt,
       };
     }
 
@@ -192,6 +228,8 @@ export function useConnectionStatus({
         label: 'Checking connection…',
         detail: 'Looking for a linked HavenAI desktop app.',
         recheck,
+        isRechecking,
+        lastRecheckAt,
       };
     }
 
@@ -234,6 +272,18 @@ export function useConnectionStatus({
       label,
       detail,
       recheck,
+      isRechecking,
+      lastRecheckAt,
     };
-  }, [isDesktopRuntime, runtimeStatus, protectionStatus, devices, nowTick, hasChecked, recheck]);
+  }, [
+    isDesktopRuntime,
+    runtimeStatus,
+    protectionStatus,
+    devices,
+    nowTick,
+    hasChecked,
+    recheck,
+    isRechecking,
+    lastRecheckAt,
+  ]);
 }

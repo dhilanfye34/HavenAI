@@ -162,16 +162,18 @@ class Coordinator:
     
     def _process_loop(self) -> None:
         """Main coordinator loop - processes alerts and correlates findings."""
+        last_alive_ping = 0.0
+        alive_interval = 10.0
         while self.running:
             # Process any alerts in the queue
             self._process_alerts()
-            
+
             # Correlate findings across agents
             correlated = self._correlate_findings()
             if correlated:
                 for alert in correlated:
                     self._handle_alert(alert)
-            
+
             # Send heartbeat periodically
             self._maybe_send_heartbeat()
 
@@ -186,6 +188,15 @@ class Coordinator:
                 except Exception as e:
                     logger.debug(f"Periodic prune failed: {e}")
                 self._last_prune = now
+
+            # Liveness ping to Electron so the UI can detect a deadlocked
+            # coordinator (stdout goes quiet without the process exiting).
+            if now - last_alive_ping >= alive_interval:
+                try:
+                    self._send_to_electron({"type": "alive", "ts": now})
+                except Exception:
+                    pass
+                last_alive_ping = now
 
             time.sleep(0.5)
     
@@ -567,7 +578,7 @@ class Coordinator:
 
         log_usage = 0.0
         try:
-            log_path = Path("havenai-agent.log")
+            log_path = Path.home() / ".havenai" / "havenai-agent.log"
             if log_path.exists():
                 # Map log file growth into a friendly 0-100 gauge.
                 log_usage = min(100.0, (log_path.stat().st_size / (1024 * 1024 * 20)) * 100.0)
@@ -964,15 +975,39 @@ class Coordinator:
 
 def main():
     """Main entry point for the agent system."""
-    # Set up logging
+    # Set up logging: rotate file in ~/.havenai so it can't grow unbounded and
+    # stays with the user's other HavenAI data regardless of where the binary
+    # was spawned from.
+    from logging.handlers import RotatingFileHandler
+
+    log_dir = Path.home() / ".havenai"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        log_dir.chmod(0o700)
+    except OSError:
+        pass
+    log_path = log_dir / "havenai-agent.log"
+
+    file_handler = RotatingFileHandler(
+        str(log_path), maxBytes=5 * 1024 * 1024, backupCount=3
+    )
+    file_handler.setFormatter(
+        logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    )
+    stderr_handler = logging.StreamHandler(sys.stderr)
+    stderr_handler.setFormatter(
+        logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    )
+
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler('havenai-agent.log'),
-            logging.StreamHandler(sys.stderr)
-        ]
+        handlers=[file_handler, stderr_handler],
     )
+
+    # httpx INFO logs the full request URL including query params and can
+    # surface tokens in logs; keep it at WARNING so only real errors appear.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     
     logger.info("=" * 50)
     logger.info("HavenAI Agent System Starting")

@@ -458,11 +458,16 @@ export default function HomePage() {
             )}
             <button
               onClick={connection.recheck}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-current/30 px-3 py-1.5 text-xs font-medium hover:bg-white/20 dark:hover:bg-black/20 transition-colors"
+              disabled={connection.isRechecking}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-current/30 px-3 py-1.5 text-xs font-medium hover:bg-white/20 dark:hover:bg-black/20 transition-colors disabled:opacity-60 disabled:cursor-wait"
               title="Re-check connection"
             >
-              <RefreshCw className="h-3 w-3" />
-              Re-check
+              <RefreshCw className={`h-3 w-3 ${connection.isRechecking ? 'animate-spin' : ''}`} />
+              {connection.isRechecking
+                ? 'Checking…'
+                : connection.lastRecheckAt && Date.now() - connection.lastRecheckAt < 2500
+                ? 'Checked'
+                : 'Re-check'}
             </button>
           </div>
         </div>
@@ -634,27 +639,40 @@ export default function HomePage() {
             <Activity className="h-4 w-4 text-blue-500" />
             Today&apos;s activity
           </h3>
-          <div className="grid grid-cols-2 gap-3">
-            {todayStats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div
-                  key={stat.label}
-                  className="flex items-center gap-3 rounded-xl bg-haven-surface-hover p-3"
-                >
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
-                    <Icon className="h-4 w-4 text-blue-500" />
+          {monitoringLive && todayStats.every((s) => s.value === 0) ? (
+            <div className="flex flex-col items-center justify-center rounded-xl bg-haven-surface-hover p-6 text-center">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-500 mb-2" />
+              <p className="text-sm font-medium text-haven-text">
+                Learning what&apos;s normal for you
+              </p>
+              <p className="mt-1 text-xs text-haven-text-tertiary max-w-xs leading-relaxed">
+                HavenAI is building your baseline — a minute or two after launch and you&apos;ll see
+                live apps, connections, and file activity here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {todayStats.map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <div
+                    key={stat.label}
+                    className="flex items-center gap-3 rounded-xl bg-haven-surface-hover p-3"
+                  >
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
+                      <Icon className="h-4 w-4 text-blue-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-lg font-bold text-haven-text leading-none">
+                        {stat.value.toLocaleString()}
+                      </p>
+                      <p className="text-[11px] text-haven-text-tertiary mt-0.5">{stat.label}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-lg font-bold text-haven-text leading-none">
-                      {stat.value.toLocaleString()}
-                    </p>
-                    <p className="text-[11px] text-haven-text-tertiary mt-0.5">{stat.label}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
