@@ -36,13 +36,21 @@ export default function LoginPage() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.detail || 'Something went wrong');
+        const detail = data.detail;
+        const message =
+          typeof detail === 'string'
+            ? detail
+            : Array.isArray(detail)
+            ? detail.map((d: any) => d.msg || d.message || JSON.stringify(d)).join('. ')
+            : 'Something went wrong';
+        throw new Error(message);
       }
 
       const data = await response.json();
+      if (!data.access_token) throw new Error('No access token received');
       localStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('refresh_token', data.refresh_token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('refresh_token', data.refresh_token || '');
+      localStorage.setItem('user', JSON.stringify(data.user || {}));
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message);

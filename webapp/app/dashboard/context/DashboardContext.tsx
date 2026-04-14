@@ -285,7 +285,7 @@ export function DashboardProvider({
     try {
       setUser(userData ? JSON.parse(userData) : null);
     } catch {
-      setUser({ email: 'Unknown user' });
+      setUser(null);
     }
     setIsDesktopRuntime(Boolean((window as any).havenai));
 

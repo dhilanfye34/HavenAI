@@ -139,7 +139,8 @@ export function useConnectionStatus({
     // ── Desktop runtime path ──
     if (isDesktopRuntime) {
       const lastSeen = runtimeStatus?.last_heartbeat_at || null;
-      const lastSeenMs = lastSeen ? new Date(lastSeen).getTime() : null;
+      const lastSeenRaw = lastSeen ? new Date(lastSeen).getTime() : NaN;
+      const lastSeenMs = Number.isFinite(lastSeenRaw) ? lastSeenRaw : null;
       const ageMs = lastSeenMs ? nowTick - lastSeenMs : null;
       const hasRuntime = Boolean(runtimeStatus);
 

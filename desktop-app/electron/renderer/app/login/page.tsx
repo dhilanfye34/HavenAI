@@ -14,12 +14,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
 
-  // If already authenticated, redirect to root (dashboard)
+  // If already authenticated, the root page.tsx polling will detect
+  // the token and switch to dashboard/onboarding automatically.
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     const user = localStorage.getItem('user');
     if (token && user) {
-      window.location.href = '/';
+      // Trigger a storage event so root page picks it up instantly
+      window.dispatchEvent(new Event('storage'));
     }
   }, []);
 
@@ -59,13 +61,21 @@ export default function LoginPage() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.detail || 'Something went wrong');
+        const detail = data.detail;
+        const message =
+          typeof detail === 'string'
+            ? detail
+            : Array.isArray(detail)
+            ? detail.map((d: any) => d.msg || d.message || JSON.stringify(d)).join('. ')
+            : 'Something went wrong';
+        throw new Error(message);
       }
 
       const data = await response.json();
+      if (!data.access_token) throw new Error('No access token received');
       localStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('refresh_token', data.refresh_token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('refresh_token', data.refresh_token || '');
+      localStorage.setItem('user', JSON.stringify(data.user || {}));
 
       const havenai = (window as any).havenai;
       if (havenai?.saveCredentials) {
@@ -83,7 +93,9 @@ export default function LoginPage() {
         });
       }
 
-      window.location.href = '/';
+      // Trigger storage event so root page detects the new token
+      // and transitions to onboarding or dashboard — no full page reload.
+      window.dispatchEvent(new Event('storage'));
     } catch (err: any) {
       setError(err.message || 'Failed to fetch');
     } finally {

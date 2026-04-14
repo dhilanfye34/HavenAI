@@ -203,7 +203,8 @@ export default function DashboardPage() {
       if (!accessToken) return;
       const refreshToken = localStorage.getItem('refresh_token') || undefined;
       const userRaw = localStorage.getItem('user');
-      const user = userRaw ? JSON.parse(userRaw) : undefined;
+      let user: any;
+      try { user = userRaw ? JSON.parse(userRaw) : undefined; } catch { user = undefined; }
 
       if (havenai?.syncAgentAuth) {
         await havenai.syncAgentAuth({ accessToken, refreshToken, user });

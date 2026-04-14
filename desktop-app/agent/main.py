@@ -20,7 +20,7 @@ import sys
 import traceback
 from datetime import datetime, timezone
 
-AGENT_VERSION = "0.1.0"
+AGENT_VERSION = "0.1.1"
 
 
 def _report_crash(exc: BaseException) -> None:

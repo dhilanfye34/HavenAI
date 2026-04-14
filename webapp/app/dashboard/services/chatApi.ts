@@ -57,12 +57,12 @@ export async function streamChatCompletion({
       const payload = event.slice(6).trim();
       if (!payload) continue;
 
-      const parsed = JSON.parse(payload) as {
-        type: 'token' | 'done' | 'error';
-        content?: string;
-        message?: string;
-        conversation_id?: string;
-      };
+      let parsed: { type: string; content?: string; message?: string; conversation_id?: string };
+      try {
+        parsed = JSON.parse(payload);
+      } catch {
+        continue; // skip malformed SSE frames
+      }
 
       if (parsed.type === 'token' && parsed.content) {
         onToken(parsed.content);

@@ -249,8 +249,10 @@ export default function EmailPage() {
 
     setEmailTesting();
 
-    havenai.configureEmailMonitor({ email: emailAddress, password: appPassword, imapHost, imapPort });
+    // Remove any stale listeners before adding a new one
+    havenai.removeAllListeners?.('email-config-result');
     havenai.onEmailConfigResult?.((result: any) => {
+      havenai.removeAllListeners?.('email-config-result');
       if (result?.success) {
         setEmailConnected(emailAddress, provider?.name || '', result.message || 'Connected successfully!');
         setAppPassword('');
@@ -258,8 +260,8 @@ export default function EmailPage() {
       } else {
         setEmailError(result?.message || 'Connection failed. Check your credentials and try again.');
       }
-      havenai.removeAllListeners?.('email-config-result');
     });
+    havenai.configureEmailMonitor({ email: emailAddress, password: appPassword, imapHost, imapPort });
   };
 
   const handleDisconnect = () => {
