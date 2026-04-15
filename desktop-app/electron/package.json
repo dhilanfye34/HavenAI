@@ -1,6 +1,6 @@
 {
   "name": "havenai",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "AI-powered personal cybersecurity agent",
   "main": "dist/main.js",
   "author": "HavenAI Team",

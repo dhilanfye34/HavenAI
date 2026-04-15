@@ -51,6 +51,54 @@ function deleteFromStore(key: string): void {
   store.delete(key);
 }
 
+// --- Per-user scoped storage ---
+//
+// We want: a brand-new account lands on a blank desktop app, while a returning
+// user picks up their old monitor toggles + email connection. We accomplish
+// that by keying account-level state (`emailMonitor`, `emailMonitorPassword`,
+// `monitorDesired`) under the current user's ID rather than a machine-global
+// slot. Machine-level data (deviceId, setupCompleted, monitorState, etc.)
+// stays unkeyed because it describes this install, not this account.
+function currentUserId(): string | null {
+  const u = store.get('user') as { id?: string } | null;
+  return u?.id || null;
+}
+
+function userScopedKey(base: string, userId: string | null | undefined): string | null {
+  if (!userId) return null;
+  return `${base}:${userId}`;
+}
+
+function readUserScoped<T>(base: string, userId: string | null = currentUserId()): T | undefined {
+  const key = userScopedKey(base, userId);
+  if (!key) return undefined;
+  return store.get(key) as T | undefined;
+}
+
+function writeUserScoped<T>(base: string, value: T, userId: string | null = currentUserId()): void {
+  const key = userScopedKey(base, userId);
+  if (!key) return;
+  store.set(key, value as any);
+}
+
+function deleteUserScoped(base: string, userId: string | null = currentUserId()): void {
+  const key = userScopedKey(base, userId);
+  if (!key) return;
+  store.delete(key as any);
+}
+
+function encryptAndStoreUserScoped(base: string, value: string, userId: string | null = currentUserId()): void {
+  const key = userScopedKey(base, userId);
+  if (!key) return;
+  encryptAndStore(key, value);
+}
+
+function decryptFromStoreUserScoped(base: string, userId: string | null = currentUserId()): string | undefined {
+  const key = userScopedKey(base, userId);
+  if (!key) return undefined;
+  return decryptFromStore(key);
+}
+
 // Global references
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -75,7 +123,10 @@ const DEFAULT_MONITOR_STATE: MonitorStateMap = {
 };
 
 function readMonitorDesired(): MonitorDesired {
-  const raw = (store.get('monitorDesired') || {}) as Partial<MonitorDesired>;
+  // Per-user: each account remembers its own toggle state. New users start
+  // with all modules off; returning users see their last preferences.
+  const scoped = readUserScoped<Partial<MonitorDesired>>('monitorDesired');
+  const raw = (scoped || {}) as Partial<MonitorDesired>;
   return {
     file: Boolean(raw.file),
     process: Boolean(raw.process),
@@ -106,7 +157,9 @@ function writeMonitorState(
   state: MonitorStateMap,
   blockers: MonitorBlockers,
 ) {
-  store.set('monitorDesired', desired);
+  // `monitorDesired` = user preference (per-account). `state`/`blockers` are
+  // real-time status about THIS install, so they stay machine-scoped.
+  writeUserScoped('monitorDesired', desired);
   store.set('monitorState', state);
   store.set('monitorBlockers', blockers);
 }
@@ -115,6 +168,40 @@ function moduleToPreferencePatch(module: MonitorModule, enabled: boolean) {
   if (module === 'file') return { file_monitoring_enabled: enabled };
   if (module === 'process') return { process_monitoring_enabled: enabled };
   return { network_monitoring_enabled: enabled };
+}
+
+// Re-apply the signed-in user's stored monitor preferences. Called after
+// auth sync so a returning user's toggles restore immediately.
+function restoreMonitorDesiredForCurrentUser(): void {
+  const desired = readMonitorDesired();
+  MONITOR_MODULES.forEach((module) => {
+    pythonBridge?.send({
+      type: 'update_preferences',
+      data: moduleToPreferencePatch(module, Boolean(desired[module])),
+    });
+  });
+  emitMonitorControlState();
+}
+
+// Re-apply the signed-in user's stored email monitor connection. If nothing
+// is stored for this user_id, the agent is told to disconnect so we don't
+// keep scanning with another user's (previously-loaded) credentials.
+function restoreEmailMonitorForCurrentUser(): void {
+  const saved = readUserScoped<any>('emailMonitor');
+  const savedPassword = decryptFromStoreUserScoped('emailMonitorPassword');
+  if (saved?.email && savedPassword) {
+    pythonBridge?.send({
+      type: 'configure_email',
+      data: {
+        host: saved.imapHost,
+        port: saved.imapPort,
+        user: saved.email,
+        password: savedPassword,
+      },
+    });
+  } else {
+    pythonBridge?.send({ type: 'disconnect_email' });
+  }
 }
 
 function buildMonitorControlState() {
@@ -449,30 +536,14 @@ function initPythonBridge(): void {
       });
     }
 
-    // Strict startup behavior: restore remembered local desired monitor states.
-    const desired = readMonitorDesired();
-    MONITOR_MODULES.forEach((module) => {
-      if (desired[module]) {
-        setMonitorDesired(module, true).catch(() => undefined);
-      } else {
-        pythonBridge?.send({ type: 'update_preferences', data: moduleToPreferencePatch(module, false) });
-      }
-    });
-    emitMonitorControlState();
-
-    // Restore email monitor credentials if saved (password encrypted via OS keychain)
-    const savedEmail = store.get('emailMonitor') as any;
-    const savedEmailPassword = decryptFromStore('emailMonitorPassword');
-    if (savedEmail?.email && savedEmailPassword) {
-      pythonBridge?.send({
-        type: 'configure_email',
-        data: {
-          host: savedEmail.imapHost,
-          port: savedEmail.imapPort,
-          user: savedEmail.email,
-          password: savedEmailPassword,
-        },
-      });
+    // If the user is already signed in (persistent session), push their
+    // preferences through immediately. Otherwise both restore functions are
+    // re-run when `auth-synced` fires after the login.
+    if (currentUserId()) {
+      restoreMonitorDesiredForCurrentUser();
+      restoreEmailMonitorForCurrentUser();
+    } else {
+      emitMonitorControlState();
     }
   });
 
@@ -540,6 +611,10 @@ function initPythonBridge(): void {
     if (data?.device_id) {
       store.set('deviceId', data.device_id);
     }
+    // Now that the agent knows who the user is, restore this user's email
+    // connection (if any) and re-apply their per-user monitor preferences.
+    restoreEmailMonitorForCurrentUser();
+    restoreMonitorDesiredForCurrentUser();
     mainWindow?.webContents.send('agent-auth', { status: 'synced', ...data });
   });
 
@@ -580,24 +655,20 @@ function initPythonBridge(): void {
   });
 
   pythonBridge.on('device-unlinked', (data: any) => {
-    // Device fully unlinked — clear all account-scoped local state so a
-    // fresh account on this machine doesn't inherit email creds, monitor
-    // preferences, or session tokens.
+    // Device unlinked = this machine no longer belongs to the account. Clear
+    // session + device identity + file/process/network monitoring state
+    // (machine-level, tied to OS permissions on THIS install). KEEP the
+    // user's email config — it's per-account, not per-device, and should
+    // travel with the account. KEEP onboardedUsers + setupCompleted too
+    // (machine-level state about what's been configured on this install).
     deleteFromStore('accessToken');
     deleteFromStore('refreshToken');
     store.delete('user');
     store.delete('deviceId');
-    store.delete('emailMonitor');
-    deleteFromStore('emailMonitorPassword');
-    const resetDesired: MonitorDesired = { file: false, process: false, network: false };
     const resetState: MonitorStateMap = { file: 'off', process: 'off', network: 'off' };
     const resetBlockers: MonitorBlockers = { file: [], process: [], network: [] };
-    store.set('monitorDesired', resetDesired);
     store.set('monitorState', resetState);
     store.set('monitorBlockers', resetBlockers);
-    // Setup was machine-scoped; keep setupCompleted but force the new user
-    // back through the welcome + setup flow.
-    store.set('setupSkipped', false);
     mainWindow?.webContents.send('device-unlinked', data);
   });
 
@@ -731,7 +802,7 @@ ipcMain.handle('hard-reset', async () => {
   } catch {
     // agent may already be dead; continue regardless
   }
-  const keys = [
+  const fixedKeys = [
     'accessToken',
     'refreshToken',
     'user',
@@ -739,19 +810,28 @@ ipcMain.handle('hard-reset', async () => {
     'onboardedUsers',
     'setupCompleted',
     'setupSkipped',
-    'monitorDesired',
     'monitorState',
     'monitorBlockers',
-    'emailMonitor',
-    'emailMonitorPassword',
     'startOnBoot',
   ];
-  for (const k of keys) {
+  for (const k of fixedKeys) {
     try {
       store.delete(k as any);
     } catch {
       /* ignore */
     }
+  }
+  // Also nuke every per-user scoped key (emailMonitor:<id>, monitorDesired:<id>, etc.)
+  try {
+    const allKeys = Object.keys((store as any).store || {});
+    const scopedPrefixes = ['emailMonitor:', 'emailMonitorPassword:', 'monitorDesired:'];
+    for (const k of allKeys) {
+      if (scopedPrefixes.some((p) => k.startsWith(p))) {
+        store.delete(k as any);
+      }
+    }
+  } catch {
+    /* ignore */
   }
   mainWindow?.webContents.reload();
   return true;
@@ -836,15 +916,20 @@ ipcMain.handle('grant-monitor-permission', async (_, module: MonitorModule) => {
 
 ipcMain.handle('agent-logout', () => {
   pythonBridge?.send({ type: 'logout' });
-  // Reset device monitor state but keep device linked (deviceId stays)
-  const resetDesired: MonitorDesired = { file: false, process: false, network: false };
+  // Stop active email scanning immediately — if someone else signs in, their
+  // auth-synced handler will restore (or disconnect) based on THEIR user_id.
+  pythonBridge?.send({ type: 'disconnect_email' });
+  // Reset real-time monitor state (agent has dropped auth; modules go inactive)
+  // but KEEP the user's monitorDesired — it's stored per-user, so their
+  // toggles are preserved for when they log back in.
   const resetState: MonitorStateMap = { file: 'off', process: 'off', network: 'off' };
   const resetBlockers: MonitorBlockers = { file: [], process: [], network: [] };
-  store.set('monitorDesired', resetDesired);
   store.set('monitorState', resetState);
   store.set('monitorBlockers', resetBlockers);
-  // Note: deviceId is NOT deleted — device stays linked to account.
-  // Email monitor config is NOT cleared — it's account-level.
+  // Email credentials are stored per-user (`emailMonitor:<user_id>`) — they
+  // stay put so the same user's next login reconnects automatically. A
+  // different user has no entry under their own id, so they start blank.
+  // deviceId also stays — device remains linked to the same account.
   return true;
 });
 
@@ -855,13 +940,14 @@ ipcMain.handle('unlink-device', () => {
 
 ipcMain.handle('configure-email-monitor', (_, payload) => {
   if (payload?.email && payload?.password) {
-    // Store email config with encrypted password via OS keychain
-    store.set('emailMonitor', {
+    // Store email config keyed by the signed-in user so a different account
+    // logging in on the same machine doesn't inherit these credentials.
+    writeUserScoped('emailMonitor', {
       email: payload.email,
       imapHost: payload.imapHost,
       imapPort: payload.imapPort,
     });
-    encryptAndStore('emailMonitorPassword', payload.password);
+    encryptAndStoreUserScoped('emailMonitorPassword', payload.password);
   }
 
   pythonBridge?.send({
@@ -877,17 +963,17 @@ ipcMain.handle('configure-email-monitor', (_, payload) => {
 });
 
 ipcMain.handle('disconnect-email-monitor', () => {
-  store.delete('emailMonitor');
-  deleteFromStore('emailMonitorPassword');
+  deleteUserScoped('emailMonitor');
+  deleteUserScoped('emailMonitorPassword');
   pythonBridge?.send({ type: 'disconnect_email' });
   return true;
 });
 
 // Expose the stored email monitor config (WITHOUT the password) so the
 // renderer can show "Connected to X" after a re-login without re-entering
-// credentials.
+// credentials. Reads the entry for the currently-signed-in user.
 ipcMain.handle('get-email-monitor-config', () => {
-  const saved = store.get('emailMonitor') as any;
+  const saved = readUserScoped<any>('emailMonitor');
   if (!saved?.email) return null;
   return {
     email: saved.email,

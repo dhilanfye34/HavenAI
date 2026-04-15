@@ -21,6 +21,7 @@ import type { LucideIcon } from 'lucide-react';
 import ShieldLock from './components/ShieldLock';
 
 import LoginForm from './login/LoginForm';
+import DeviceConflictScreen from './login/DeviceConflictScreen';
 import DashboardPage from './dashboard/page';
 import SetupFlow from './setup/SetupFlow';
 import { useAppState } from './hooks/useAppState';
@@ -232,15 +233,17 @@ export default function HomePage() {
     );
   }
 
-  if (app.state === 'login' || app.state === 'login-device-conflict') {
+  if (app.state === 'login-device-conflict') {
     return (
-      <LoginForm
-        deviceConflictMessage={
-          app.state === 'login-device-conflict' ? app.deviceConflictMessage : null
-        }
-        onLoginSuccess={app.onLoginSuccess}
+      <DeviceConflictScreen
+        message={app.deviceConflictMessage}
+        onBackToLogin={app.dismissDeviceConflict}
       />
     );
+  }
+
+  if (app.state === 'login') {
+    return <LoginForm onLoginSuccess={app.onLoginSuccess} />;
   }
 
   if (app.state === 'onboarding') {

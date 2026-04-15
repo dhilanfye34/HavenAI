@@ -36,6 +36,7 @@ export interface AppStateValue {
   onSetupSkipped: () => void;
   onLogout: () => void;
   replayOnboarding: () => void;
+  dismissDeviceConflict: () => void;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -376,6 +377,14 @@ export function useAppState(): AppStateValue {
     setState('onboarding');
   }, []);
 
+  const dismissDeviceConflict = useCallback(() => {
+    // User hit "Back to login" from the conflict screen — drop the warning
+    // and return to the vanilla login form so they can try a different
+    // account or retry after unlinking on the web.
+    setDeviceConflictMessage(null);
+    setState('login');
+  }, []);
+
   return {
     state,
     user,
@@ -387,5 +396,6 @@ export function useAppState(): AppStateValue {
     onSetupSkipped,
     onLogout,
     replayOnboarding,
+    dismissDeviceConflict,
   };
 }

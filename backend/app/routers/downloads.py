@@ -10,7 +10,7 @@ from typing import Optional
 
 router = APIRouter()
 
-APP_VERSION = "0.1.3"
+APP_VERSION = "0.1.4"
 REPO_SLUG = "dhilanfye34/HavenAI"
 RELEASE_BASE = f"https://github.com/{REPO_SLUG}/releases/download/v{APP_VERSION}"
 

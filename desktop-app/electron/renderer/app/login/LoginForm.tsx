@@ -1,54 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Loader2, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import ShieldLock from '../components/ShieldLock';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const WEB_DASHBOARD_URL =
-  process.env.NEXT_PUBLIC_WEB_URL || 'https://havenai.ai/dashboard/settings';
 
 export interface LoginFormProps {
-  // When present, the login page is in LOGIN_DEVICE_CONFLICT — show the rich
-  // banner with web-dashboard + support actions. When null, regular login.
-  deviceConflictMessage?: string | null;
   onLoginSuccess?: () => void;
 }
 
-export default function LoginForm({
-  deviceConflictMessage,
-  onLoginSuccess,
-}: LoginFormProps = {}) {
+export default function LoginForm({ onLoginSuccess }: LoginFormProps = {}) {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [conflictMessage, setConflictMessage] = useState<string | null>(
-    deviceConflictMessage ?? null,
-  );
 
-  // Keep local conflict state in sync with the parent prop — the state hook
-  // resets it on successful login.
-  useEffect(() => {
-    setConflictMessage(deviceConflictMessage ?? null);
-  }, [deviceConflictMessage]);
-
-  useEffect(() => {
-    const havenai = (window as any).havenai;
-    if (havenai?.onDeviceLinkedError) {
-      havenai.onDeviceLinkedError((message: string) => {
-        setLoading(false);
-        setConflictMessage(message || 'This device is linked to another account.');
-      });
-    }
-    return () => {
-      if (havenai?.removeAllListeners) {
-        havenai.removeAllListeners('device-linked-error');
-      }
-    };
-  }, []);
+  // Device-linked-error is handled globally by the root state machine
+  // (useAppState). When it fires it transitions us to the dedicated
+  // DeviceConflictScreen — no banner needed here.
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +78,6 @@ export default function LoginForm({
         });
       }
 
-      setConflictMessage(null);
       onLoginSuccess?.();
     } catch (err: any) {
       setError(err.message || 'Failed to fetch');
@@ -129,40 +100,7 @@ export default function LoginForm({
             {isLogin ? 'Welcome back' : 'Create your account'}
           </h2>
 
-          {conflictMessage && (
-            <div className="mb-6 rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
-              <p className="font-medium">{conflictMessage}</p>
-              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300/80">
-                If you own the other account, sign in on the web and unlink this device. Otherwise,
-                get in touch and we&apos;ll help sort it out.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const havenai = (window as any).havenai;
-                    if (havenai?.openExternal) {
-                      havenai.openExternal(WEB_DASHBOARD_URL);
-                    } else {
-                      window.open(WEB_DASHBOARD_URL, '_blank', 'noopener');
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Open web dashboard to unlink
-                </button>
-                <a
-                  href="mailto:support@havenai.ai?subject=Device%20linked%20to%20another%20account"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-200 transition hover:bg-amber-100 dark:hover:bg-amber-500/10"
-                >
-                  Contact support
-                </a>
-              </div>
-            </div>
-          )}
-
-          {error && !conflictMessage && (
+          {error && (
             <div className="mb-6 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-300">
               {error}
             </div>

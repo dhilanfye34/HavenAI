@@ -187,6 +187,7 @@ class EmailInboxAgent(Agent):
     def analyze(self, observation: Dict[str, Any]) -> Dict[str, Any]:
         """Score each email and emit findings for suspicious ones."""
         findings: List[Dict[str, Any]] = []
+        scored_emails: List[Dict[str, Any]] = []
 
         for email_msg in observation.get("emails", []):
             risk_score, reasons = self._analyze_email(email_msg)
@@ -194,6 +195,11 @@ class EmailInboxAgent(Agent):
             # Log every email's score for debugging
             subject = email_msg.get("subject", "(no subject)")[:50]
             logger.info(f"Email scored: {risk_score:.2f} — \"{subject}\" from {email_msg.get('from_email', '?')}")
+
+            # Every scanned email is retained locally (UI-only, never synced)
+            # with its score + reasons so the inbox tab can render the full
+            # timeline, not just the flagged ones.
+            scored_emails.append({**email_msg, "risk_score": risk_score, "reasons": reasons})
 
             # Threshold raised to 0.5 — common legit emails (Google security
             # notices, receipts, promos) routinely hit 2–3 weak keywords and
@@ -208,7 +214,21 @@ class EmailInboxAgent(Agent):
                     }
                 )
 
+        # Maintain a rolling list of the last 30 scanned emails across cycles
+        # so the tab shows history, not just "new since last scan".
+        history = list(self.shared_context[self.name].get("recent_emails", []) or [])
+        history.extend(scored_emails)
+        # Dedupe by message_id, keeping newest scoring; trim to 30.
+        seen_ids = {}
+        for e in history:
+            mid = e.get("message_id") or e.get("uid")
+            if mid:
+                seen_ids[mid] = e
+        # Preserve insertion order (dict preserves order in 3.7+), then trim.
+        deduped = list(seen_ids.values())[-30:]
+
         self.shared_context[self.name]["findings"] = findings
+        self.shared_context[self.name]["recent_emails"] = deduped
         self.shared_context[self.name]["last_scan_count"] = len(observation.get("emails", []))
         self.shared_context[self.name]["enabled"] = observation.get("enabled", False)
         self.shared_context[self.name]["total_scanned"] = len(self._seen_ids)

@@ -4,13 +4,19 @@ import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronRight,
+  Clock,
   ExternalLink,
+  Inbox,
   Loader2,
   Lock,
   Mail,
   MessageCircle,
+  Paperclip,
   ShieldCheck,
+  TrendingUp,
   Unplug,
+  X,
 } from 'lucide-react';
 import ShieldLock from '../../components/ShieldLock';
 import { useDashboard } from '../context/DashboardContext';
@@ -201,6 +207,8 @@ export default function EmailPage() {
   const [manualHost, setManualHost] = useState('');
   const [manualPort, setManualPort] = useState('993');
   const [showSetup, setShowSetup] = useState(false);
+  // Which email row is currently expanded in the detail modal (null = closed)
+  const [openEmailId, setOpenEmailId] = useState<string | null>(null);
 
   const testStatus = emailConnection.status === 'connected' ? 'success'
     : emailConnection.status === 'testing' ? 'testing'
@@ -235,6 +243,33 @@ export default function EmailPage() {
 
   const emailAlerts = allEmailAlerts.filter((a) => !safelist.isSafe('emails', a.id));
   const reviewedEmails = allEmailAlerts.filter((a) => safelist.isSafe('emails', a.id));
+
+  // Recent inbox activity — every scanned message with its risk score, not
+  // just the flagged ones. Agent sends up to 30.
+  const recentEmails = emailHealth?.recent_emails ?? [];
+
+  // Summary stats for the strip above the activity feed.
+  const now24h = Date.now() - 86_400_000;
+  const scoredSafe = recentEmails.filter((e) => (e.risk_score ?? 0) < 0.5).length;
+  const scoredSuspicious = recentEmails.filter((e) => (e.risk_score ?? 0) >= 0.5).length;
+  const scanned24h = recentEmails.filter((e) => {
+    if (!e.received_at) return false;
+    const ts = Date.parse(e.received_at);
+    return Number.isFinite(ts) && ts >= now24h;
+  }).length;
+
+  const openEmail = useMemo(() => {
+    if (!openEmailId) return null;
+    return recentEmails.find((e) => (e.message_id || e.uid) === openEmailId) || null;
+  }, [openEmailId, recentEmails]);
+
+  const riskTone = (score: number | undefined) => {
+    const s = score ?? 0;
+    if (s >= 0.7) return { label: 'High risk', dot: 'bg-red-500', text: 'text-red-500' };
+    if (s >= 0.5) return { label: 'Suspicious', dot: 'bg-amber-500', text: 'text-amber-500' };
+    if (s >= 0.3) return { label: 'Low concern', dot: 'bg-blue-500', text: 'text-blue-500' };
+    return { label: 'Clean', dot: 'bg-emerald-500', text: 'text-emerald-500' };
+  };
 
   const handleConnect = () => {
     const havenai = (window as any).havenai;
@@ -520,8 +555,212 @@ export default function EmailPage() {
               <span className="font-medium text-haven-text-secondary">
                 {user.full_name ? `${user.full_name} (${user.email})` : user.email}
               </span>
+              <span className="ml-2">{'\u00b7 alerts are sent here'}</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Stats strip — quick numbers for the inbox scanner */}
+      {isDesktopRuntime && isConnected && !showSetup && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="card p-4">
+            <div className="flex items-center gap-2 text-xs text-haven-text-tertiary">
+              <Inbox className="h-3.5 w-3.5" />
+              Total scanned
+            </div>
+            <p className="mt-1 text-xl font-semibold text-haven-text">{totalScanned.toLocaleString()}</p>
+          </div>
+          <div className="card p-4">
+            <div className="flex items-center gap-2 text-xs text-haven-text-tertiary">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Last 24h
+            </div>
+            <p className="mt-1 text-xl font-semibold text-haven-text">{scanned24h}</p>
+          </div>
+          <div className="card p-4">
+            <div className="flex items-center gap-2 text-xs text-haven-text-tertiary">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+              Suspicious
+            </div>
+            <p className="mt-1 text-xl font-semibold text-amber-500">{scoredSuspicious}</p>
+          </div>
+          <div className="card p-4">
+            <div className="flex items-center gap-2 text-xs text-haven-text-tertiary">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+              Looks clean
+            </div>
+            <p className="mt-1 text-xl font-semibold text-emerald-500">{scoredSafe}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Recent inbox activity — timeline of everything scanned, not just flagged */}
+      {isDesktopRuntime && isConnected && !showSetup && recentEmails.length > 0 && (
+        <div className="card p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-haven-text">
+              <Clock className="h-4 w-4 text-blue-500" />
+              Recent inbox activity
+            </h2>
+            <span className="text-xs text-haven-text-tertiary">
+              {`${recentEmails.length} message${recentEmails.length === 1 ? '' : 's'} \u00b7 last 30`}
+            </span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--haven-border)' }}>
+            {[...recentEmails]
+              .sort((a, b) => {
+                const ta = a.received_at ? Date.parse(a.received_at) : 0;
+                const tb = b.received_at ? Date.parse(b.received_at) : 0;
+                return tb - ta;
+              })
+              .map((email) => {
+                const tone = riskTone(email.risk_score);
+                const key = email.message_id || email.uid || `${email.from_email}:${email.subject}`;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setOpenEmailId(key)}
+                    className="flex w-full items-start gap-3 py-3 text-left transition hover:bg-haven-surface-hover -mx-3 px-3 rounded-lg"
+                  >
+                    <span className={`mt-1 inline-block h-2 w-2 flex-shrink-0 rounded-full ${tone.dot}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-haven-text truncate">
+                          {email.subject || '(no subject)'}
+                        </p>
+                        {email.has_attachments && (
+                          <Paperclip className="h-3 w-3 flex-shrink-0 text-haven-text-tertiary" />
+                        )}
+                      </div>
+                      <p className="text-xs text-haven-text-tertiary truncate">
+                        {email.from_name || email.from_email || 'Unknown sender'}
+                        {email.from_name && email.from_email ? ` \u00b7 ${email.from_email}` : ''}
+                      </p>
+                      {email.snippet && (
+                        <p className="mt-1 text-xs text-haven-text-tertiary/80 line-clamp-1">
+                          {email.snippet}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 text-[11px] text-haven-text-tertiary">
+                      {email.received_at && (
+                        <span>{timeAgo(new Date(email.received_at).toISOString())}</span>
+                      )}
+                      <span className={`font-medium ${tone.text}`}>{tone.label}</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 mt-1 flex-shrink-0 text-haven-text-tertiary" />
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* Detail modal for a selected email */}
+      {openEmail && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+          onClick={() => setOpenEmailId(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="card w-full max-w-xl p-6 animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-haven-text-tertiary uppercase tracking-wide">
+                  Scanned email
+                </p>
+                <h3 className="mt-0.5 text-base font-semibold text-haven-text">
+                  {openEmail.subject || '(no subject)'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setOpenEmailId(null)}
+                className="rounded-lg p-1 text-haven-text-tertiary transition hover:bg-haven-surface-hover"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <dl className="grid grid-cols-[96px_1fr] gap-y-2 gap-x-3 text-xs">
+              <dt className="text-haven-text-tertiary">From</dt>
+              <dd className="text-haven-text break-all">
+                {openEmail.from_name
+                  ? `${openEmail.from_name} <${openEmail.from_email}>`
+                  : openEmail.from_email || 'Unknown'}
+              </dd>
+              <dt className="text-haven-text-tertiary">Received</dt>
+              <dd className="text-haven-text">
+                {openEmail.received_at
+                  ? new Date(openEmail.received_at).toLocaleString()
+                  : 'Unknown'}
+              </dd>
+              <dt className="text-haven-text-tertiary">Risk score</dt>
+              <dd className={`font-medium ${riskTone(openEmail.risk_score).text}`}>
+                {`${(openEmail.risk_score ?? 0).toFixed(2)} \u00b7 ${riskTone(openEmail.risk_score).label}`}
+              </dd>
+              {openEmail.has_attachments && (
+                <>
+                  <dt className="text-haven-text-tertiary">Attachments</dt>
+                  <dd className="text-haven-text">Yes</dd>
+                </>
+              )}
+            </dl>
+
+            {openEmail.reasons && openEmail.reasons.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-haven-text mb-1.5">Why this score</p>
+                <ul className="space-y-1 text-xs text-haven-text-secondary">
+                  {openEmail.reasons.map((r, i) => (
+                    <li key={i} className="flex gap-1.5">
+                      <span className="text-haven-text-tertiary">{'\u2022'}</span>
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {openEmail.snippet && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-haven-text mb-1.5">Preview</p>
+                <div className="rounded-lg border p-3 text-xs text-haven-text-secondary whitespace-pre-wrap break-words" style={{ borderColor: 'var(--haven-border)', background: 'var(--haven-surface)' }}>
+                  {openEmail.snippet}
+                </div>
+                <p className="mt-1.5 text-[11px] text-haven-text-tertiary">
+                  HavenAI only stores a short preview. Open the message in your email app for the full content.
+                </p>
+              </div>
+            )}
+
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => {
+                  chatSendMessage(
+                    `Tell me about this email: "${openEmail.subject}" from ${openEmail.from_email}. Risk score ${(openEmail.risk_score ?? 0).toFixed(2)}. Should I be worried?`,
+                  );
+                  setOpenEmailId(null);
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-blue-600"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                Ask in chat
+              </button>
+              <button
+                onClick={() => setOpenEmailId(null)}
+                className="rounded-lg border px-3 py-2 text-xs font-medium text-haven-text-secondary transition hover:bg-haven-surface-hover"
+                style={{ borderColor: 'var(--haven-border)' }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

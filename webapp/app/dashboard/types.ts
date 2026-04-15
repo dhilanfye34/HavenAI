@@ -112,10 +112,24 @@ export interface AgentRuntimeStatus {
           from_email?: string;
           subject?: string;
           received_at?: string;
+          snippet?: string;
+          has_attachments?: boolean;
         };
         risk_score?: number;
         reasons?: string[];
         recommendation?: string;
+      }>;
+      recent_emails?: Array<{
+        message_id?: string;
+        uid?: string;
+        from_name?: string;
+        from_email?: string;
+        subject?: string;
+        snippet?: string;
+        received_at?: string;
+        has_attachments?: boolean;
+        risk_score?: number;
+        reasons?: string[];
       }>;
     };
   } | null;

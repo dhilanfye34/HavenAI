@@ -671,6 +671,7 @@ class Coordinator:
                 "enabled": bool(email_ctx.get("enabled", False)),
                 "last_scan_count": int(email_ctx.get("last_scan_count", 0) or 0),
                 "findings": list(email_ctx.get("findings", []) or [])[-10:],
+                "recent_emails": list(email_ctx.get("recent_emails", []) or [])[-30:],
                 "total_scanned": int(email_ctx.get("total_scanned", 0) or 0),
                 "last_scan_at": float(email_ctx.get("last_scan_at", 0) or 0) or None,
                 "last_successful_scan_at": float(email_ctx.get("last_successful_scan_at", 0) or 0) or None,
