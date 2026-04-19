@@ -13,6 +13,7 @@ import { app } from 'electron';
 
 export class PythonBridge extends EventEmitter {
   private process: ChildProcess | null = null;
+  private stopTimer: ReturnType<typeof setTimeout> | null = null;
   private buffer: string = '';
   private lastMessageAt: number = 0;
   private livenessTimer: ReturnType<typeof setInterval> | null = null;
@@ -147,6 +148,10 @@ export class PythonBridge extends EventEmitter {
     this.process.on('exit', (code) => {
       console.log(`Python agent exited with code ${code}`);
       this.process = null;
+      if (this.stopTimer) {
+        clearTimeout(this.stopTimer);
+        this.stopTimer = null;
+      }
       if (this.livenessTimer) {
         clearInterval(this.livenessTimer);
         this.livenessTimer = null;
@@ -189,6 +194,9 @@ export class PythonBridge extends EventEmitter {
       return;
     }
 
+    const proc = this.process;
+    const pid = proc.pid;
+
     // Send stop command
     this.send({ type: 'stop' });
 
@@ -197,13 +205,42 @@ export class PythonBridge extends EventEmitter {
       this.livenessTimer = null;
     }
 
-    // Give it a moment to clean up, then force kill
-    setTimeout(() => {
-      if (this.process) {
-        this.process.kill();
+    if (this.stopTimer) {
+      clearTimeout(this.stopTimer);
+      this.stopTimer = null;
+    }
+
+    // Give the agent a moment to shut down gracefully, then force terminate.
+    this.stopTimer = setTimeout(() => {
+      this.forceTerminate(pid);
+      if (this.process === proc) {
         this.process = null;
       }
-    }, 2000);
+      this.stopTimer = null;
+    }, 3000);
+  }
+
+  private forceTerminate(pid?: number): void {
+    if (!pid) return;
+
+    try {
+      if (process.platform === 'win32') {
+        execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore' });
+        return;
+      }
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch {
+        // Best effort; follow up with SIGKILL below if needed.
+      }
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // Process may already be gone.
+      }
+    } catch {
+      // Ignore termination failures during shutdown.
+    }
   }
 
   /**

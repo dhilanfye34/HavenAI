@@ -49,6 +49,15 @@
           "havenai-agent",
           "havenai-agent.exe"
         ]
+      },
+      {
+        "from": "scripts/uninstall",
+        "to": "uninstall",
+        "filter": [
+          "cleanup-windows.ps1",
+          "cleanup-unix.sh",
+          "uninstall-havenai.sh"
+        ]
       }
     ],
     "mac": {
@@ -70,7 +79,8 @@
       ]
     },
     "nsis": {
-      "artifactName": "HavenAI-Setup-${version}.${ext}"
+      "artifactName": "HavenAI-Setup-${version}.${ext}",
+      "include": "scripts/uninstall/installer.nsh"
     },
     "portable": {
       "artifactName": "HavenAI-Portable-${version}.${ext}"
@@ -82,6 +92,9 @@
         "deb"
       ],
       "category": "Utility"
+    },
+    "deb": {
+      "afterRemove": "scripts/uninstall/cleanup-unix.sh"
     },
     "publish": [
       {

@@ -70,6 +70,19 @@ Windows NSIS installers are produced as:
 Linux desktop artifacts include:
 - `release/HavenAI-<version>.AppImage`
 
+## Uninstall Cleanup
+
+HavenAI now ships uninstall cleanup scripts that:
+- Stop running `havenai-agent` / `HavenAI` processes.
+- Remove local agent/app data (`~/.havenai` and Electron user-data folders).
+
+Platform behavior:
+- **Windows NSIS:** cleanup runs automatically during uninstall via NSIS hook.
+- **Linux deb:** cleanup runs automatically on package removal via `afterRemove`.
+- **Linux AppImage / macOS dmg:** no native uninstall hook exists, so run the bundled helper manually before deleting the app:
+  - macOS: `bash "/Applications/HavenAI.app/Contents/Resources/uninstall/uninstall-havenai.sh"`
+  - Linux (installed package path): `bash "/opt/HavenAI/resources/uninstall/uninstall-havenai.sh"`
+
 ## Icons
 
 Before building, add icons to the `assets/` directory:

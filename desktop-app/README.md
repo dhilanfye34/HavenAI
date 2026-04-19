@@ -61,3 +61,10 @@ This creates:
 - `release/HavenAI-Setup-<version>.exe` (Windows NSIS installer)
 - `release/HavenAI-<version>-arm64.dmg` (macOS)
 - `release/HavenAI-<version>.AppImage` (Linux AppImage)
+
+## Uninstall behavior
+
+- Windows NSIS and Linux deb removals now run cleanup hooks that stop/remove bundled Python agent processes and local HavenAI data.
+- macOS DMG and Linux AppImage do not support automatic uninstall hooks; run the bundled cleanup helper before deleting the app bundle/image:
+  - `bash "/Applications/HavenAI.app/Contents/Resources/uninstall/uninstall-havenai.sh"`
+  - `bash "/opt/HavenAI/resources/uninstall/uninstall-havenai.sh"`
