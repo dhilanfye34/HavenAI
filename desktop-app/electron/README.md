@@ -67,6 +67,8 @@ Built apps will be in the `release/` directory.
 
 Windows NSIS installers are produced as:
 - `release/HavenAI-Setup-<version>.exe`
+Linux desktop artifacts include:
+- `release/HavenAI-<version>.AppImage`
 
 ## Icons
 
@@ -83,10 +85,19 @@ To regenerate icon assets from the ShieldLock source icon:
 python create-icons.py
 ```
 
-## Windows Release Automation
+## Release Automation
 
 Windows releases are automated by `.github/workflows/release-windows.yml`:
 
 - Trigger: push a version tag like `v0.1.4`
 - Runner: `windows-latest`
 - Output: uploads `HavenAI-Setup-<version>.exe` and updater metadata to the matching GitHub Release
+
+Linux releases are automated by `.github/workflows/release-linux.yml`:
+
+- Trigger: push a version tag like `v0.1.4`
+- Runner: `ubuntu-latest`
+- Output: uploads `HavenAI-<version>.AppImage` and Linux updater metadata to the matching GitHub Release
+
+Versioning rule for releases:
+- Keep `desktop-app/electron/package.json` version, `backend/app/routers/downloads.py` `APP_VERSION`, and the Git tag `v<version>` in sync.

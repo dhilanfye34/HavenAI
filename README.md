@@ -249,9 +249,16 @@ python -m havenai.agents.coordinator
 cd desktop-app/electron
 npm run package:mac
 npm run package:win
+npm run package:linux
 # Output: release/HavenAI-0.1.0-arm64.dmg
 # Output: release/HavenAI-Setup-0.1.0.exe
+# Output: release/HavenAI-0.1.0.AppImage
 ```
+
+For tagged releases, keep these versions aligned:
+- `desktop-app/electron/package.json` (`version`)
+- `backend/app/routers/downloads.py` (`APP_VERSION`)
+- Git tag (`v<version>`)
 
 ## Deployment
 
@@ -260,7 +267,7 @@ npm run package:win
 | Web App | Vercel | Configured via `webapp/vercel.json` |
 | Backend API | Render | Web service with `uvicorn app.main:app` |
 | Database | Render | PostgreSQL (internal URL for backend) |
-| Desktop App | GitHub Releases | `.dmg` (macOS) and `.exe` (Windows) uploaded per release |
+| Desktop App | GitHub Releases | `.dmg` (macOS), `.exe` (Windows), and `.AppImage` (Linux) uploaded per release |
 
 ## Team
 

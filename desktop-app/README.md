@@ -54,8 +54,10 @@ npm run dev
 # From desktop-app/electron
 npm run package:mac
 npm run package:win
+npm run package:linux
 ```
 
 This creates:
 - `release/HavenAI-Setup-<version>.exe` (Windows NSIS installer)
 - `release/HavenAI-<version>-arm64.dmg` (macOS)
+- `release/HavenAI-<version>.AppImage` (Linux AppImage)
