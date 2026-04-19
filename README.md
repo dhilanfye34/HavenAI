@@ -149,7 +149,7 @@ HavenAI/
 | Layer | Technology | Hosting |
 |-------|-----------|---------|
 | Web Frontend | Next.js 14, Tailwind CSS, Three.js (shaders) | Vercel |
-| Desktop App | Electron, Next.js (static export) | GitHub Releases (.dmg) |
+| Desktop App | Electron, Next.js (static export) | GitHub Releases (.dmg + .exe) |
 | Agent System | Python 3, psutil, watchdog, imaplib | Runs locally |
 | Local Storage | SQLite (via Python sqlite3) | `~/.havenai/havenai.db` |
 | Backend API | FastAPI, SQLAlchemy, Pydantic | Render |
@@ -248,7 +248,9 @@ python -m havenai.agents.coordinator
 ```bash
 cd desktop-app/electron
 npm run package:mac
+npm run package:win
 # Output: release/HavenAI-0.1.0-arm64.dmg
+# Output: release/HavenAI-Setup-0.1.0.exe
 ```
 
 ## Deployment
@@ -258,7 +260,7 @@ npm run package:mac
 | Web App | Vercel | Configured via `webapp/vercel.json` |
 | Backend API | Render | Web service with `uvicorn app.main:app` |
 | Database | Render | PostgreSQL (internal URL for backend) |
-| Desktop App | GitHub Releases | `.dmg` binary uploaded per release |
+| Desktop App | GitHub Releases | `.dmg` (macOS) and `.exe` (Windows) uploaded per release |
 
 ## Team
 

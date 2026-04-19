@@ -51,6 +51,9 @@ This will:
 ## Building for Distribution
 
 ```bash
+# Build the bundled Python agent for this OS
+npm run build:agent
+
 # Build for current platform
 npm run package
 
@@ -62,15 +65,28 @@ npm run package:linux
 
 Built apps will be in the `release/` directory.
 
+Windows NSIS installers are produced as:
+- `release/HavenAI-Setup-<version>.exe`
+
 ## Icons
 
 Before building, add icons to the `assets/` directory:
 - `icon.png` - 512x512 PNG for Linux
 - `icon.icns` - Mac icon bundle
-- `icon.ico` - Windows icon
+- `icon.ico` - Optional Windows icon (app falls back to `icon.png` if missing)
 - `tray.png` - 16x16 or 32x32 tray icon
 - `trayTemplate.png` - Mac tray icon (template for dark/light mode)
 
-You can generate these from a single PNG using tools like:
-- https://www.electron.build/icons
-- `electron-icon-maker` npm package
+To regenerate icon assets from the ShieldLock source icon:
+
+```bash
+python create-icons.py
+```
+
+## Windows Release Automation
+
+Windows releases are automated by `.github/workflows/release-windows.yml`:
+
+- Trigger: push a version tag like `v0.1.4`
+- Runner: `windows-latest`
+- Output: uploads `HavenAI-Setup-<version>.exe` and updater metadata to the matching GitHub Release

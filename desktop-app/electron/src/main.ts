@@ -349,9 +349,12 @@ function createWindow(): void {
     },
     // Start hidden, show when ready
     show: false,
+    // Hide the default top menu toolbar (File/Edit/View...) on desktop.
+    autoHideMenuBar: true,
     // Nice rounded corners on Mac
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
   });
+  mainWindow.setMenuBarVisibility(false);
 
   // Load the renderer
   if (isDev) {
@@ -475,10 +478,16 @@ function createTray(): void {
  */
 function getIconPath(): string {
   const iconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
-  if (isDev) {
-    return path.join(__dirname, '../assets', iconName);
+  const preferredPath = isDev
+    ? path.join(__dirname, '../assets', iconName)
+    : path.join(process.resourcesPath, 'assets', iconName);
+  if (fs.existsSync(preferredPath)) {
+    return preferredPath;
   }
-  return path.join(process.resourcesPath, 'assets', iconName);
+  const fallbackName = 'icon.png';
+  return isDev
+    ? path.join(__dirname, '../assets', fallbackName)
+    : path.join(process.resourcesPath, 'assets', fallbackName);
 }
 
 /**

@@ -10,29 +10,25 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-# Use the venv's PyInstaller explicitly so we pick up the right site-packages
-PYI="venv/bin/pyinstaller"
-if [ ! -x "$PYI" ]; then
-  echo "ERROR: venv/bin/pyinstaller not found. Run: venv/bin/pip install pyinstaller" >&2
+# Use the venv's Python explicitly so we pick up the right site-packages.
+PYTHON="venv/bin/python"
+if [ ! -x "$PYTHON" ]; then
+  echo "ERROR: venv/bin/python not found. Create the venv first." >&2
   exit 1
 fi
 
 rm -rf build dist
 
-"$PYI" \
-  --onefile \
-  --name havenai-agent \
-  --clean \
-  --noconfirm \
-  --hidden-import httpx \
-  --hidden-import psutil \
-  --hidden-import watchdog \
-  --hidden-import watchdog.observers \
-  --hidden-import watchdog.events \
-  --hidden-import watchdog.observers.fsevents \
-  --collect-submodules havenai \
-  main.py
+"$PYTHON" -m PyInstaller --clean --noconfirm havenai-agent.spec
 
 echo ""
-echo "Built: $(pwd)/dist/havenai-agent"
-ls -lh dist/havenai-agent
+if [ -f "dist/havenai-agent" ]; then
+  echo "Built: $(pwd)/dist/havenai-agent"
+  ls -lh dist/havenai-agent
+elif [ -f "dist/havenai-agent.exe" ]; then
+  echo "Built: $(pwd)/dist/havenai-agent.exe"
+  ls -lh dist/havenai-agent.exe
+else
+  echo "ERROR: PyInstaller finished but no agent binary was found in dist/." >&2
+  exit 1
+fi

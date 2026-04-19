@@ -5,6 +5,7 @@ Generate HavenAI desktop app icons from the website's ShieldLock SVG.
 Renders the exact same shield-with-lock mark used on the website
 (webapp/app/icon.svg) as a crisp vector, and exports:
   - assets/icon.png         512x512, app icon (electron-builder derives .icns/.ico from this)
+  - assets/icon.ico         multi-size Windows icon
   - assets/tray.png         32x32,  menubar/tray icon (colored)
   - assets/trayTemplate.png 32x32,  macOS template (black/transparent for menu bars)
 
@@ -79,6 +80,15 @@ def main():
     icon_path = os.path.join(assets, "icon.png")
     bg.save(icon_path)
     print(f"Created: {icon_path}")
+
+    # Also emit a proper Windows .ico with multiple icon sizes embedded.
+    icon_ico_path = os.path.join(assets, "icon.ico")
+    bg.save(
+        icon_ico_path,
+        format="ICO",
+        sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],
+    )
+    print(f"Created: {icon_ico_path}")
 
     # 2) Tray icon (colored): 32x32, same gradient + white glyph.
     bg_tray = _rounded_gradient_bg(32)

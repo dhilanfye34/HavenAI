@@ -29,17 +29,15 @@ DOWNLOADS = {
         "min_os": "macOS 12 (Monterey)",
         "arch": "Apple Silicon (M1+) · Intel via Rosetta",
     },
-    # Windows and Linux builds are not available yet.
-    # Uncomment when you run package:win / package:linux and upload the artifacts.
-    # "windows": {
-    #     "platform": "windows",
-    #     "label": "Windows",
-    #     "filename": f"HavenAI-Setup-{APP_VERSION}.exe",
-    #     "url": _asset_url(f"HavenAI-Setup-{APP_VERSION}.exe"),
-    #     "size": "78 MB",
-    #     "min_os": "Windows 10 (64-bit)",
-    #     "arch": "x64",
-    # },
+    "windows": {
+        "platform": "windows",
+        "label": "Windows",
+        "filename": f"HavenAI-Setup-{APP_VERSION}.exe",
+        "url": _asset_url(f"HavenAI-Setup-{APP_VERSION}.exe"),
+        "size": "78 MB",
+        "min_os": "Windows 10 (64-bit)",
+        "arch": "x64",
+    },
     # "linux": {
     #     "platform": "linux",
     #     "label": "Linux",

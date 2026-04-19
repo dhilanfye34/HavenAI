@@ -51,11 +51,11 @@ npm run dev
 ## Building
 
 ```bash
-# Build installers for all platforms
-npm run build
+# From desktop-app/electron
+npm run package:mac
+npm run package:win
 ```
 
 This creates:
-- `dist/HavenAI-Setup.exe` (Windows)
-- `dist/HavenAI.dmg` (macOS)
-- `dist/HavenAI.AppImage` (Linux)
+- `release/HavenAI-Setup-<version>.exe` (Windows NSIS installer)
+- `release/HavenAI-<version>-arm64.dmg` (macOS)

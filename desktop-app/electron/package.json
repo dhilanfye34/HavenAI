@@ -10,12 +10,14 @@
     "dev:electron": "tsc && env -u ELECTRON_RUN_AS_NODE electron .",
     "dev:renderer": "npm --prefix renderer run dev -- -p ${RENDERER_PORT:-3001}",
     "build": "npm run build:renderer && npm run build:electron",
+    "build:agent": "node -e \"const c=require('child_process');const fs=require('fs');const path=require('path');const cwd=path.resolve(process.cwd(),'../agent');fs.rmSync(path.join(cwd,'build'),{recursive:true,force:true});fs.rmSync(path.join(cwd,'dist'),{recursive:true,force:true});if(process.platform==='win32'){const py=path.join(cwd,'venv','Scripts','python.exe');if(!fs.existsSync(py)){console.error('ERROR: venv\\\\Scripts\\\\python.exe not found. Create the agent venv first.');process.exit(1);}const r=c.spawnSync(py,['-m','PyInstaller','--clean','--noconfirm','havenai-agent.spec'],{cwd,stdio:'inherit'});if(r.error) throw r.error;process.exit(r.status||0);}const r=c.spawnSync('bash',['build_binary.sh'],{cwd,stdio:'inherit'});if(r.error) throw r.error;process.exit(r.status||0);\"",
     "build:electron": "tsc",
+    "build:icons": "python create-icons.py",
     "build:renderer": "cd renderer && npm run build",
-    "package": "npm run build && electron-builder",
-    "package:mac": "npm run build && electron-builder --mac",
-    "package:win": "npm run build && electron-builder --win",
-    "package:linux": "npm run build && electron-builder --linux"
+    "package": "npm run build:agent && npm run build && electron-builder",
+    "package:mac": "npm run build:agent && npm run build && electron-builder --mac",
+    "package:win": "npm run build:agent && npm run build && electron-builder --win",
+    "package:linux": "npm run build:agent && npm run build && electron-builder --linux"
   },
   "dependencies": {
     "electron-store": "^8.1.0",
@@ -36,12 +38,17 @@
     },
     "files": [
       "dist/**/*",
-      "renderer/out/**/*"
+      "renderer/out/**/*",
+      "assets/**/*"
     ],
     "extraResources": [
       {
-        "from": "../agent/dist/havenai-agent",
-        "to": "agent/havenai-agent"
+        "from": "../agent/dist",
+        "to": "agent",
+        "filter": [
+          "havenai-agent",
+          "havenai-agent.exe"
+        ]
       }
     ],
     "mac": {
@@ -61,6 +68,12 @@
         "nsis",
         "portable"
       ]
+    },
+    "nsis": {
+      "artifactName": "HavenAI-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "HavenAI-Portable-${version}.${ext}"
     },
     "linux": {
       "icon": "assets/icon.png",

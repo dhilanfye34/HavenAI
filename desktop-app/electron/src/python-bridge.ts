@@ -100,7 +100,8 @@ export class PythonBridge extends EventEmitter {
 
     // In packaged builds, use the PyInstaller-built binary (no Python needed).
     // In dev, use the venv's Python + main.py directly.
-    const binaryPath = path.join(agentPath, 'havenai-agent');
+    const binaryName = process.platform === 'win32' ? 'havenai-agent.exe' : 'havenai-agent';
+    const binaryPath = path.join(agentPath, binaryName);
     if (app.isPackaged && fs.existsSync(binaryPath)) {
       console.log(`Starting agent binary: ${binaryPath}`);
       this.process = spawn(binaryPath, [], {
