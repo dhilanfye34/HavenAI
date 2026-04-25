@@ -1,0 +1,115 @@
+name: Release Windows Desktop
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build and upload, e.g. v0.1.5"
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify tag matches package version
+        shell: pwsh
+        run: |
+          $tagVersion = "${env:RELEASE_TAG}" -replace '^v', ''
+          $packageVersion = (Get-Content desktop-app/electron/package.json | ConvertFrom-Json).version
+          if ($packageVersion -ne $tagVersion) {
+            throw "Tag version v$tagVersion does not match desktop-app/electron/package.json version $packageVersion."
+          }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            webapp/package-lock.json
+            desktop-app/electron/package-lock.json
+            desktop-app/electron/renderer/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Electron dependencies
+        run: npm ci
+        working-directory: desktop-app/electron
+
+      - name: Install renderer dependencies
+        run: npm ci
+        working-directory: desktop-app/electron/renderer
+
+      - name: Install webapp dependencies
+        run: npm ci
+        working-directory: webapp
+
+      - name: Prepare agent virtualenv
+        shell: pwsh
+        run: |
+          python -m venv desktop-app/agent/venv
+          desktop-app/agent/venv/Scripts/python -m pip install --upgrade pip
+          desktop-app/agent/venv/Scripts/python -m pip install -r desktop-app/agent/requirements.txt pyinstaller
+
+      - name: Build bundled agent
+        run: npm run build:agent
+        working-directory: desktop-app/electron
+
+      - name: Build Electron app
+        run: npm run build
+        working-directory: desktop-app/electron
+
+      - name: Package Windows app
+        run: npx electron-builder --win --publish never
+        working-directory: desktop-app/electron
+
+      - name: Upload Windows assets to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: |
+            desktop-app/electron/release/HavenAI-Setup-*.exe
+            desktop-app/electron/release/HavenAI-Portable-*.exe
+            desktop-app/electron/release/*.blockmap
+            desktop-app/electron/release/latest.yml
+          fail_on_unmatched_files: true
+
+      - name: Verify release artifacts
+        shell: pwsh
+        run: |
+          $releaseDir = "desktop-app/electron/release"
+          if (-not (Test-Path -LiteralPath $releaseDir)) {
+            throw "Release directory not found: $releaseDir"
+          }
+
+          $setupExe = Get-ChildItem -LiteralPath $releaseDir -Filter "HavenAI-Setup-*.exe" | Select-Object -First 1
+          if (-not $setupExe) {
+            throw "Expected NSIS installer artifact HavenAI-Setup-*.exe was not produced."
+          }
+
+          $latestYml = Join-Path $releaseDir "latest.yml"
+          if (-not (Test-Path -LiteralPath $latestYml)) {
+            throw "Expected updater metadata latest.yml was not produced."
+          }
+
+          Write-Host "Validated artifacts:"
+          Write-Host " - $($setupExe.Name)"
+          Write-Host " - latest.yml"

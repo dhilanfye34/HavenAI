@@ -1,12 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_submodules
 
-hiddenimports = ['httpx', 'psutil', 'watchdog', 'watchdog.observers', 'watchdog.events', 'watchdog.observers.fsevents']
-hiddenimports += collect_submodules('havenai')
+hiddenimports = [
+    "httpx",
+    "psutil",
+    "watchdog",
+    "watchdog.observers",
+    "watchdog.events",
+]
+hiddenimports += collect_submodules("watchdog.observers")
+hiddenimports += collect_submodules("havenai")
 
 
 a = Analysis(
-    ['main.py'],
+    ["main.py"],
     pathex=[],
     binaries=[],
     datas=[],
@@ -26,7 +33,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='havenai-agent',
+    name="havenai-agent",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

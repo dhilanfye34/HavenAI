@@ -6,11 +6,10 @@ Provides download links and metadata for the HavenAI desktop app.
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Optional
 
 router = APIRouter()
 
-APP_VERSION = "0.1.4"
+APP_VERSION = "0.1.5"
 REPO_SLUG = "dhilanfye34/HavenAI"
 RELEASE_BASE = f"https://github.com/{REPO_SLUG}/releases/download/v{APP_VERSION}"
 
@@ -29,26 +28,24 @@ DOWNLOADS = {
         "min_os": "macOS 12 (Monterey)",
         "arch": "Apple Silicon (M1+) · Intel via Rosetta",
     },
-    # Windows and Linux builds are not available yet.
-    # Uncomment when you run package:win / package:linux and upload the artifacts.
-    # "windows": {
-    #     "platform": "windows",
-    #     "label": "Windows",
-    #     "filename": f"HavenAI-Setup-{APP_VERSION}.exe",
-    #     "url": _asset_url(f"HavenAI-Setup-{APP_VERSION}.exe"),
-    #     "size": "78 MB",
-    #     "min_os": "Windows 10 (64-bit)",
-    #     "arch": "x64",
-    # },
-    # "linux": {
-    #     "platform": "linux",
-    #     "label": "Linux",
-    #     "filename": f"HavenAI-{APP_VERSION}.AppImage",
-    #     "url": _asset_url(f"HavenAI-{APP_VERSION}.AppImage"),
-    #     "size": "90 MB",
-    #     "min_os": "Ubuntu 20.04+ / Fedora 34+",
-    #     "arch": "x64",
-    # },
+    "windows": {
+        "platform": "windows",
+        "label": "Windows",
+        "filename": f"HavenAI-Setup-{APP_VERSION}.exe",
+        "url": _asset_url(f"HavenAI-Setup-{APP_VERSION}.exe"),
+        "size": "78 MB",
+        "min_os": "Windows 10 (64-bit)",
+        "arch": "x64",
+    },
+    "linux": {
+        "platform": "linux",
+        "label": "Linux",
+        "filename": f"HavenAI-{APP_VERSION}.AppImage",
+        "url": _asset_url(f"HavenAI-{APP_VERSION}.AppImage"),
+        "size": "90 MB",
+        "min_os": "Ubuntu 20.04+ / Fedora 34+",
+        "arch": "x64",
+    },
 }
 
 

@@ -22,6 +22,8 @@ import { Footer } from '../components/Footer';
 import { ShaderHeroCanvas } from '../components/ShaderHeroCanvas';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const FALLBACK_VERSION = '0.1.5';
+const FALLBACK_RELEASE_BASE = `https://github.com/dhilanfye34/HavenAI/releases/download/v${FALLBACK_VERSION}`;
 
 interface PlatformDownload {
   platform: string;
@@ -73,13 +75,13 @@ export default function DownloadPage() {
       .then((data) => setDownloads(data))
       .catch(() => {
         setDownloads({
-          version: '0.1.0',
+          version: FALLBACK_VERSION,
           platforms: {
             macos: {
               platform: 'macos',
               label: 'macOS',
-              filename: 'HavenAI-0.1.0.dmg',
-              url: '#',
+              filename: `HavenAI-${FALLBACK_VERSION}-arm64.dmg`,
+              url: `${FALLBACK_RELEASE_BASE}/HavenAI-${FALLBACK_VERSION}-arm64.dmg`,
               size: '85 MB',
               min_os: 'macOS 12 (Monterey)',
               arch: 'Universal (Intel + Apple Silicon)',
@@ -87,8 +89,8 @@ export default function DownloadPage() {
             windows: {
               platform: 'windows',
               label: 'Windows',
-              filename: 'HavenAI-Setup-0.1.0.exe',
-              url: '#',
+              filename: `HavenAI-Setup-${FALLBACK_VERSION}.exe`,
+              url: `${FALLBACK_RELEASE_BASE}/HavenAI-Setup-${FALLBACK_VERSION}.exe`,
               size: '78 MB',
               min_os: 'Windows 10 (64-bit)',
               arch: 'x64',
@@ -96,8 +98,8 @@ export default function DownloadPage() {
             linux: {
               platform: 'linux',
               label: 'Linux',
-              filename: 'HavenAI-0.1.0.AppImage',
-              url: '#',
+              filename: `HavenAI-${FALLBACK_VERSION}.AppImage`,
+              url: `${FALLBACK_RELEASE_BASE}/HavenAI-${FALLBACK_VERSION}.AppImage`,
               size: '90 MB',
               min_os: 'Ubuntu 20.04+ / Fedora 34+',
               arch: 'x64',
@@ -129,7 +131,7 @@ export default function DownloadPage() {
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="section-badge mb-6 justify-center">
             <Download className="h-4 w-4" />
-            Version {downloads?.version ?? '0.1.0'}
+            Version {downloads?.version ?? FALLBACK_VERSION}
           </div>
           <h1 className="text-4xl font-bold tracking-tight md:text-6xl lg:text-7xl">
             Download <span className="text-gradient">HavenAI</span>
