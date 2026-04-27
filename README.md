@@ -16,7 +16,7 @@ HavenAI is a multi-agent AI system that monitors your computer for security thre
 - **AI Chat Assistant** — Conversational security assistant with full context of all active agents, powered by OpenAI
 - **Real-Time Dashboard** — Live file events, process spawns, network connections, health metrics, and alert feed
 - **Notification Channels** — Email, SMS (Twilio), and automated voice call alerts based on configurable severity thresholds
-- **Privacy-First** — Credentials never leave the device; raw telemetry stays local; cloud only sees aggregated alerts
+- **Privacy-First** — IMAP and account credentials are encrypted on-device via the OS keychain (macOS Keychain / Windows DPAPI / libsecret); raw telemetry (file events, processes, connections) stays in local SQLite; only medium+ severity alerts (with the context needed to explain them) sync to the cloud
 - **Modern UI** — Glassmorphism design system with WebGL shader backgrounds, built with Tailwind CSS and lucide-react
 
 ## Architecture

@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://postgres:postgres@localhost:5432/havenai"
     
     # JWT Authentication
+    # Default is a placeholder usable ONLY when environment == "development".
+    # In any non-dev environment the startup check below will refuse to run with this value.
     jwt_secret: str = "dev-secret-change-this-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -61,7 +63,7 @@ class Settings(BaseSettings):
     
     # Environment
     environment: str = "development"
-    debug: bool = True
+    debug: bool = False
 
     model_config = SettingsConfigDict(
         env_file=str(REPO_ROOT_DIR / ".env"),
@@ -77,8 +79,21 @@ _logger = logging.getLogger(__name__)
 settings = Settings()
 
 
+_DEFAULT_JWT_SECRET = "dev-secret-change-this-in-production"
+
+
 def log_config_warnings() -> None:
-    """Log warnings for missing optional service credentials at startup."""
+    """Validate startup config. Raises on insecure prod, warns on missing optional creds."""
+    # Hard fail: refuse to run in non-dev environments with the default JWT secret.
+    # The default is published in this repo, so any token signed with it is forgable.
+    if settings.jwt_secret == _DEFAULT_JWT_SECRET and settings.environment != "development":
+        raise RuntimeError(
+            "JWT_SECRET is set to the default placeholder value. Refusing to start in "
+            f"environment={settings.environment!r}. Set the JWT_SECRET environment "
+            "variable to a 64-char random hex string "
+            "(generate with: python -c \"import secrets; print(secrets.token_hex(32))\")."
+        )
+
     if not settings.sendgrid_api_key or settings.sendgrid_api_key.startswith("your-"):
         _logger.warning(
             "SENDGRID_API_KEY is not configured — email notifications will be skipped."
@@ -91,7 +106,14 @@ def log_config_warnings() -> None:
         _logger.warning(
             "OPENAI_API_KEY is not configured — AI chat assistant will not function."
         )
-    if settings.jwt_secret == "dev-secret-change-this-in-production" and settings.environment != "development":
+    if settings.jwt_secret == _DEFAULT_JWT_SECRET:
+        # Reached only when environment == "development".
         _logger.warning(
-            "JWT_SECRET is still the default value — change it before deploying to production!"
+            "JWT_SECRET is the default placeholder. Fine for local dev only — set a real "
+            "secret before deploying anywhere users will sign in."
+        )
+    if settings.debug and settings.environment != "development":
+        _logger.warning(
+            "DEBUG is enabled in environment=%r — error responses may leak stack traces.",
+            settings.environment,
         )
