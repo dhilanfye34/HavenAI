@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import {
   Download,
   Apple,
@@ -11,10 +10,6 @@ import {
   Cpu,
   HardDrive,
   Wifi,
-  ArrowRight,
-  Sparkles,
-  Info,
-  MousePointerClick,
 } from 'lucide-react';
 import ShieldLock from '../components/ShieldLock';
 import { Navbar } from '../components/Navbar';
@@ -57,10 +52,37 @@ const platformIcons: Record<string, React.ReactNode> = {
   linux: <Terminal className="h-7 w-7" />,
 };
 
-const platformColors: Record<string, { border: string; glow: string; text: string; bg: string }> = {
-  macos: { border: 'border-violet-500/20', glow: 'rgba(139, 92, 246, 0.08)', text: 'text-violet-400', bg: 'bg-violet-500/10' },
-  windows: { border: 'border-cyan-500/20', glow: 'rgba(34, 211, 238, 0.08)', text: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-  linux: { border: 'border-amber-500/20', glow: 'rgba(245, 158, 11, 0.08)', text: 'text-amber-400', bg: 'bg-amber-500/10' },
+const platformIconsLarge: Record<string, React.ReactNode> = {
+  macos: <Apple className="h-10 w-10" />,
+  windows: <Monitor className="h-10 w-10" />,
+  linux: <Terminal className="h-10 w-10" />,
+};
+
+const platformColors: Record<
+  string,
+  { border: string; glow: string; text: string; bg: string; gradient: string }
+> = {
+  macos: {
+    border: 'border-violet-500/25',
+    glow: 'rgba(139, 92, 246, 0.18)',
+    text: 'text-violet-300',
+    bg: 'bg-violet-500/10',
+    gradient: 'from-violet-500/20 via-purple-500/10 to-transparent',
+  },
+  windows: {
+    border: 'border-cyan-500/25',
+    glow: 'rgba(34, 211, 238, 0.18)',
+    text: 'text-cyan-300',
+    bg: 'bg-cyan-500/10',
+    gradient: 'from-cyan-500/20 via-blue-500/10 to-transparent',
+  },
+  linux: {
+    border: 'border-amber-500/25',
+    glow: 'rgba(245, 158, 11, 0.18)',
+    text: 'text-amber-300',
+    bg: 'bg-amber-500/10',
+    gradient: 'from-amber-500/20 via-orange-500/10 to-transparent',
+  },
 };
 
 export default function DownloadPage() {
@@ -82,9 +104,9 @@ export default function DownloadPage() {
               label: 'macOS',
               filename: `HavenAI-${FALLBACK_VERSION}-arm64.dmg`,
               url: `${FALLBACK_RELEASE_BASE}/HavenAI-${FALLBACK_VERSION}-arm64.dmg`,
-              size: '85 MB',
+              size: '130 MB',
               min_os: 'macOS 12 (Monterey)',
-              arch: 'Universal (Intel + Apple Silicon)',
+              arch: 'Apple Silicon (M1+) · Intel via Rosetta',
             },
             windows: {
               platform: 'windows',
@@ -110,10 +132,15 @@ export default function DownloadPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const detectedDownload = detected && downloads?.platforms[detected];
-  const otherPlatforms = downloads
-    ? Object.values(downloads.platforms).filter((p) => p.platform !== detected)
-    : [];
+  const allPlatforms = downloads ? Object.values(downloads.platforms) : [];
+  const platformOrder = ['macos', 'windows', 'linux'];
+  const sortedPlatforms = [...allPlatforms].sort(
+    (a, b) => platformOrder.indexOf(a.platform) - platformOrder.indexOf(b.platform)
+  );
+  const detectedPlatform = detected ? sortedPlatforms.find((p) => p.platform === detected) : null;
+  const otherPlatforms = detectedPlatform
+    ? sortedPlatforms.filter((p) => p.platform !== detected)
+    : sortedPlatforms;
 
   return (
     <div className="relative min-h-screen bg-[#0a0a0f] text-white">
@@ -121,242 +148,263 @@ export default function DownloadPage() {
       <div className="absolute top-0 left-0 h-[70vh] w-full" style={{ zIndex: 0 }}>
         <ShaderHeroCanvas className="opacity-30" />
       </div>
-      <div className="pointer-events-none absolute top-[40vh] left-0 h-[30vh] w-full bg-gradient-to-b from-transparent to-[#0a0a0f]" style={{ zIndex: 0 }} />
+      <div
+        className="pointer-events-none absolute top-[40vh] left-0 h-[30vh] w-full bg-gradient-to-b from-transparent to-[#0a0a0f]"
+        style={{ zIndex: 0 }}
+      />
 
       <div className="relative" style={{ zIndex: 1 }}>
-      <Navbar />
+        <Navbar />
 
-      {/* Hero */}
-      <section className="relative overflow-hidden pt-32 pb-16">
-        <div className="relative mx-auto max-w-4xl px-6 text-center">
-          <div className="section-badge mb-6 justify-center">
-            <Download className="h-4 w-4" />
-            Version {downloads?.version ?? FALLBACK_VERSION}
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight md:text-6xl lg:text-7xl">
-            Download <span className="text-gradient">HavenAI</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-xl text-lg text-gray-400">
-            Install the desktop agent to start monitoring your system. It runs
-            quietly in the background and keeps you safe.
-          </p>
-        </div>
-      </section>
-
-      {/* Detected platform — primary download */}
-      {!loading && detectedDownload && (
-        <section className="mx-auto max-w-xl px-6 pb-8">
-          <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8 text-center">
-            {/* Subtle glow */}
-            <div className="pointer-events-none absolute -top-20 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full blur-3xl" style={{ background: platformColors[detectedDownload.platform]?.glow }} />
-
-            <div className={`relative mb-3 inline-flex rounded-2xl ${platformColors[detectedDownload.platform]?.bg} p-4 ${platformColors[detectedDownload.platform]?.text}`}>
-              {platformIcons[detectedDownload.platform]}
+        {/* Hero */}
+        <section className="relative overflow-hidden pt-32 pb-12">
+          <div className="relative mx-auto max-w-4xl px-6 text-center">
+            <div className="section-badge mb-6 justify-center">
+              <Download className="h-4 w-4" />
+              Version {downloads?.version ?? FALLBACK_VERSION}
             </div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
-              Recommended for your system
+            <h1 className="text-4xl font-bold tracking-tight md:text-6xl lg:text-7xl">
+              Download <span className="text-gradient">HavenAI</span>
+            </h1>
+            <p className="mx-auto mt-6 max-w-xl text-lg text-gray-400">
+              Install the desktop agent to start monitoring your system. It runs
+              quietly in the background and keeps you safe.
             </p>
-            <h2 className="mt-2 text-2xl font-bold">
-              HavenAI for {detectedDownload.label}
-            </h2>
-
-            <a href={detectedDownload.url} className="btn-primary mt-6 gap-2">
-              <Download className="h-5 w-5" />
-              Download for {detectedDownload.label}
-            </a>
-
-            <p className="mt-3 text-xs text-gray-500">
-              {detectedDownload.filename} &middot; {detectedDownload.size}
-            </p>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-left text-sm">
-                <p className="text-xs text-gray-500">Requires</p>
-                <p className="text-gray-300">{detectedDownload.min_os}</p>
-              </div>
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-left text-sm">
-                <p className="text-xs text-gray-500">Architecture</p>
-                <p className="text-gray-300">{detectedDownload.arch}</p>
-              </div>
-            </div>
           </div>
         </section>
-      )}
 
-      {/* Private beta notice — macOS Gatekeeper warning workaround */}
-      <section className="mx-auto max-w-xl px-6 pb-2">
-        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-5">
-          <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
-              <Info className="h-4 w-4 text-amber-400" />
+        {/* Detected platform — hero card */}
+        {!loading && detectedPlatform && (
+          <section className="mx-auto max-w-3xl px-6 pb-6">
+            <DetectedPlatformCard platform={detectedPlatform} />
+          </section>
+        )}
+
+        {/* Other platforms — normal cards */}
+        {!loading && otherPlatforms.length > 0 && (
+          <section className="mx-auto max-w-5xl px-6 py-8">
+            {detectedPlatform && (
+              <h2 className="mb-5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Other platforms
+              </h2>
+            )}
+            <div
+              className={`grid gap-4 ${
+                otherPlatforms.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'
+              }`}
+            >
+              {otherPlatforms.map((p) => (
+                <CompactPlatformCard key={p.platform} platform={p} />
+              ))}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-amber-300">Private beta · macOS install note</p>
-              <p className="mt-1.5 text-xs leading-relaxed text-gray-400">
-                HavenAI is in private beta and the macOS build isn&rsquo;t notarized yet. The first
-                time you open it, macOS will say it can&rsquo;t verify the developer. This is expected
-                — here&rsquo;s how to get past it:
-              </p>
-              <ol className="mt-3 space-y-2 text-xs text-gray-400">
-                <li className="flex gap-2.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[10px] font-bold text-amber-300">
-                    1
-                  </span>
-                  <span className="pt-0.5">Open your Downloads folder and double-click <span className="font-mono text-amber-200">HavenAI.dmg</span> to mount it.</span>
-                </li>
-                <li className="flex gap-2.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[10px] font-bold text-amber-300">
-                    2
-                  </span>
-                  <span className="pt-0.5">Drag HavenAI into your Applications folder.</span>
-                </li>
-                <li className="flex gap-2.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[10px] font-bold text-amber-300">
-                    3
-                  </span>
-                  <span className="pt-0.5">
-                    Open Applications, <span className="inline-flex items-center gap-1 font-medium text-amber-200">
-                      <MousePointerClick className="h-3 w-3" /> right-click
-                    </span> (or Control-click) HavenAI, and choose <span className="font-medium text-amber-200">Open</span>.
-                  </span>
-                </li>
-                <li className="flex gap-2.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[10px] font-bold text-amber-300">
-                    4
-                  </span>
-                  <span className="pt-0.5">
-                    In the dialog that appears, click <span className="font-medium text-amber-200">Open</span> again. From then on, double-clicking works normally.
-                  </span>
-                </li>
-              </ol>
-              <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
-                Why this happens: Apple requires paid developer certificates to skip this warning.
-                We&rsquo;re finalizing ours — future releases will install without any extra steps.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+          </section>
+        )}
 
-      {/* Other platforms */}
-      <section className="mx-auto max-w-4xl px-6 py-8">
-        <h3 className="mb-6 text-center text-sm font-semibold uppercase tracking-wider text-gray-500">
-          {detected ? 'Other platforms' : 'Choose your platform'}
-        </h3>
-        <div className="grid gap-4 md:grid-cols-3">
-          {(detected ? otherPlatforms : Object.values(downloads?.platforms ?? {})).map((p) => {
-            const colors = platformColors[p.platform];
-            return (
-              <div key={p.platform} className={`group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.04]`}>
-                <div className="pointer-events-none absolute -top-16 left-1/2 h-32 w-32 -translate-x-1/2 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100" style={{ background: colors?.glow }} />
-                <div className={`relative mb-4 inline-flex rounded-2xl ${colors?.bg} p-3.5 ${colors?.text}`}>
-                  {platformIcons[p.platform]}
-                </div>
-                <h4 className="text-lg font-semibold">{p.label}</h4>
-                <p className="mt-1 text-xs text-gray-500">
-                  {p.size} &middot; {p.arch}
-                </p>
-                <a
-                  href={p.url}
-                  className="btn-secondary mt-4 gap-1.5 !px-5 !py-2 text-sm"
-                >
-                  <Download className="h-4 w-4" />
-                  Download
-                </a>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+        {/* Setup steps */}
+        <section className="py-20">
+          <div className="mx-auto max-w-4xl px-6">
+            <h2 className="mb-14 text-center text-2xl font-bold tracking-tight md:text-3xl">
+              Get started in <span className="text-gradient">3 steps</span>
+            </h2>
+            <div className="relative grid gap-6 md:grid-cols-3">
+              <div className="pointer-events-none absolute top-8 left-[16.67%] right-[16.67%] hidden h-px bg-gradient-to-r from-violet-500/20 via-cyan-500/20 to-emerald-500/20 md:block" />
 
-      {/* Setup steps */}
-      <section className="py-20">
-        <div className="mx-auto max-w-4xl px-6">
-          <h2 className="mb-14 text-center text-2xl font-bold tracking-tight md:text-3xl">
-            Get started in <span className="text-gradient">3 steps</span>
-          </h2>
-          <div className="relative grid gap-6 md:grid-cols-3">
-            {/* Connection line behind steps */}
-            <div className="pointer-events-none absolute top-8 left-[16.67%] right-[16.67%] hidden h-px bg-gradient-to-r from-violet-500/20 via-cyan-500/20 to-emerald-500/20 md:block" />
-
-            {[
-              { step: 1, title: 'Download & Install', desc: 'Download HavenAI for your OS and run the installer. Takes less than a minute.', color: 'from-violet-500 to-purple-600' },
-              { step: 2, title: 'Sign In', desc: 'Log in with your HavenAI account so alerts sync to the web dashboard.', color: 'from-cyan-500 to-blue-600' },
-              { step: 3, title: "You're Protected", desc: 'HavenAI runs in the background, monitoring files, processes, and network.', color: 'from-emerald-500 to-teal-600' },
-            ].map(({ step, title, desc, color }) => (
-              <div key={step} className="relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center">
-                <div className={`relative mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${color} text-sm font-bold text-white shadow-lg`}>
-                  {step}
-                </div>
-                <h4 className="mb-2 text-base font-semibold text-white">{title}</h4>
-                <p className="text-sm leading-relaxed text-gray-500">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* What gets monitored */}
-      <section className="py-16">
-        <div className="mx-auto max-w-4xl px-6">
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10">
-            <div className="mb-2 flex justify-center">
-              <div className="section-badge mb-4">
-                <ShieldLock className="h-4 w-4" />
-                Coverage
-              </div>
-            </div>
-            <h3 className="mb-8 text-center text-xl font-bold">
-              What the desktop agent monitors
-            </h3>
-            <div className="grid gap-6 md:grid-cols-3">
               {[
-                { icon: HardDrive, label: 'File Activity', desc: 'Downloads, new executables, suspicious file names', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-                { icon: Cpu, label: 'Processes', desc: 'New spawns, unusual parent-child chains', color: 'text-violet-400', bg: 'bg-violet-500/10' },
-                { icon: Wifi, label: 'Network', desc: 'Suspicious connections, unusual ports', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-              ].map(({ icon: Icon, label, desc, color, bg }) => (
-                <div key={label} className="flex flex-col items-center gap-3 text-center">
-                  <div className={`inline-flex rounded-xl ${bg} p-3 ${color}`}>
-                    <Icon className="h-6 w-6" />
+                { step: 1, title: 'Download & Install', desc: 'Download HavenAI for your OS and run the installer. Takes less than a minute.', color: 'from-violet-500 to-purple-600' },
+                { step: 2, title: 'Sign In', desc: 'Log in with your HavenAI account so alerts sync to the web dashboard.', color: 'from-cyan-500 to-blue-600' },
+                { step: 3, title: "You're Protected", desc: 'HavenAI runs in the background, monitoring files, processes, and network.', color: 'from-emerald-500 to-teal-600' },
+              ].map(({ step, title, desc, color }) => (
+                <div key={step} className="relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center">
+                  <div className={`relative mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${color} text-sm font-bold text-white shadow-lg`}>
+                    {step}
                   </div>
-                  <span className="font-medium text-white">{label}</span>
-                  <span className="text-xs leading-relaxed text-gray-500">{desc}</span>
+                  <h4 className="mb-2 text-base font-semibold text-white">{title}</h4>
+                  <p className="text-sm leading-relaxed text-gray-500">{desc}</p>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* System requirements */}
-      <section className="py-12 pb-24">
-        <div className="mx-auto max-w-2xl px-6">
-          <h3 className="mb-6 text-center text-sm font-semibold uppercase tracking-wider text-gray-500">
-            System requirements
-          </h3>
-          <div className="space-y-3">
-            {[
-              { label: 'macOS', value: 'macOS 12 (Monterey) or later, Intel or Apple Silicon', platform: 'macos' },
-              { label: 'Windows', value: 'Windows 10 64-bit or later, 4 GB RAM', platform: 'windows' },
-              { label: 'Linux', value: 'Ubuntu 20.04+ / Fedora 34+, x64, 4 GB RAM', platform: 'linux' },
-            ].map((req) => (
-              <div
-                key={req.label}
-                className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-sm"
-              >
-                <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
-                <div>
-                  <span className="font-medium text-white">{req.label}</span>
-                  <span className="text-gray-500"> — {req.value}</span>
+        {/* What gets monitored */}
+        <section className="py-16">
+          <div className="mx-auto max-w-4xl px-6">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10">
+              <div className="mb-2 flex justify-center">
+                <div className="section-badge mb-4">
+                  <ShieldLock className="h-4 w-4" />
+                  Coverage
                 </div>
               </div>
-            ))}
+              <h3 className="mb-8 text-center text-xl font-bold">
+                What the desktop agent monitors
+              </h3>
+              <div className="grid gap-6 md:grid-cols-3">
+                {[
+                  { icon: HardDrive, label: 'File Activity', desc: 'Downloads, new executables, suspicious file names', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+                  { icon: Cpu, label: 'Processes', desc: 'New spawns, unusual parent-child chains', color: 'text-violet-400', bg: 'bg-violet-500/10' },
+                  { icon: Wifi, label: 'Network', desc: 'Suspicious connections, unusual ports', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+                ].map(({ icon: Icon, label, desc, color, bg }) => (
+                  <div key={label} className="flex flex-col items-center gap-3 text-center">
+                    <div className={`inline-flex rounded-xl ${bg} p-3 ${color}`}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <span className="font-medium text-white">{label}</span>
+                    <span className="text-xs leading-relaxed text-gray-500">{desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <Footer />
+        {/* System requirements */}
+        <section className="py-12 pb-24">
+          <div className="mx-auto max-w-2xl px-6">
+            <h3 className="mb-6 text-center text-sm font-semibold uppercase tracking-wider text-gray-500">
+              System requirements
+            </h3>
+            <div className="space-y-3">
+              {[
+                { label: 'macOS', value: 'macOS 12 (Monterey) or later, Intel or Apple Silicon', platform: 'macos' },
+                { label: 'Windows', value: 'Windows 10 64-bit or later, 4 GB RAM', platform: 'windows' },
+                { label: 'Linux', value: 'Ubuntu 20.04+ / Fedora 34+, x64, 4 GB RAM', platform: 'linux' },
+              ].map((req) => (
+                <div
+                  key={req.label}
+                  className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-sm"
+                >
+                  <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+                  <div>
+                    <span className="font-medium text-white">{req.label}</span>
+                    <span className="text-gray-500"> — {req.value}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <Footer />
       </div>
     </div>
+  );
+}
+
+/* ─────────── Detected platform — featured hero card ─────────── */
+function DetectedPlatformCard({ platform }: { platform: PlatformDownload }) {
+  const colors = platformColors[platform.platform];
+
+  return (
+    <div className="group relative">
+      <div
+        className={`relative overflow-hidden rounded-3xl border ${colors.border} bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-white/[0.04] backdrop-blur-xl transition-all duration-500 hover:border-white/20`}
+      >
+        {/* Inner accent gradient */}
+        <div
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${colors.gradient} opacity-60 transition-opacity duration-500 group-hover:opacity-100`}
+        />
+
+        {/* Soft glow orb behind icon */}
+        <div
+          className="pointer-events-none absolute -top-32 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full blur-3xl transition-all duration-700 group-hover:scale-110"
+          style={{ background: colors.glow }}
+        />
+
+        {/* Subtle diagonal shimmer on hover */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 -translate-x-full -skew-x-12 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
+        </div>
+
+        {/* Corner accents */}
+        <div className="pointer-events-none absolute top-0 left-0 h-24 w-24 rounded-br-3xl bg-gradient-to-br from-white/[0.05] to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+        <div className="pointer-events-none absolute bottom-0 right-0 h-24 w-24 rounded-tl-3xl bg-gradient-to-tl from-white/[0.05] to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+
+        <div className="relative z-10 flex flex-col items-center p-10 text-center md:p-12">
+          {/* Icon with subtle ring + scale on hover */}
+          <div className="relative mb-3 inline-flex">
+            <div
+              className={`absolute inset-0 rounded-2xl border ${colors.border} opacity-60`}
+              style={{ transform: 'scale(1.15)' }}
+            />
+            <div
+              className={`relative inline-flex rounded-2xl ${colors.bg} p-5 ${colors.text} shadow-2xl transition-transform duration-500 group-hover:scale-105`}
+            >
+              {platformIconsLarge[platform.platform]}
+            </div>
+          </div>
+
+          {/* Detected badge — sits under icon, smaller */}
+          <div className="mb-5 inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-emerald-300">
+            <CheckCircle className="h-2.5 w-2.5" />
+            Detected OS
+          </div>
+
+          {/* Title */}
+          <h2 className="mb-2 text-4xl font-bold tracking-tight md:text-5xl">
+            <span className="text-gradient">{platform.label}</span>
+          </h2>
+
+          <p className="mb-1 text-sm text-gray-400">{platform.filename}</p>
+          <p className="mb-7 text-xs text-gray-500">{platform.size}</p>
+
+          {/* CTA */}
+          <a
+            href={platform.url}
+            className="group/btn relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-white px-8 py-3.5 text-sm font-semibold text-black shadow-lg transition-all duration-300 hover:shadow-xl hover:shadow-white/10 active:scale-[0.98]"
+          >
+            <Download className="h-4 w-4 transition-transform duration-300 group-hover/btn:-translate-y-0.5" />
+            Download for {platform.label}
+          </a>
+
+          {/* Specs grid */}
+          <div className="mt-8 grid w-full max-w-md grid-cols-2 gap-3">
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-center backdrop-blur-sm">
+              <p className="text-[10px] uppercase tracking-wider text-gray-500">Requires</p>
+              <p className="mt-1 text-xs font-medium text-gray-200">{platform.min_os}</p>
+            </div>
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-center backdrop-blur-sm">
+              <p className="text-[10px] uppercase tracking-wider text-gray-500">Architecture</p>
+              <p className="mt-1 text-xs font-medium text-gray-200">{platform.arch}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── Other platforms — compact cards ─────────── */
+function CompactPlatformCard({ platform }: { platform: PlatformDownload }) {
+  const colors = platformColors[platform.platform];
+
+  return (
+    <a
+      href={platform.url}
+      className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:border-white/[0.14] hover:bg-white/[0.04]"
+    >
+      {/* Soft hover glow */}
+      <div
+        className="pointer-events-none absolute -left-10 top-1/2 h-32 w-32 -translate-y-1/2 rounded-full blur-3xl opacity-0 transition-opacity duration-500 group-hover:opacity-60"
+        style={{ background: colors.glow }}
+      />
+
+      <div
+        className={`relative inline-flex shrink-0 rounded-xl ${colors.bg} p-3 ${colors.text} transition-transform duration-300 group-hover:scale-110`}
+      >
+        {platformIcons[platform.platform]}
+      </div>
+
+      <div className="relative flex-1 min-w-0">
+        <p className="text-base font-semibold text-white">{platform.label}</p>
+        <p className="truncate text-xs text-gray-500">
+          {platform.size} · {platform.arch}
+        </p>
+      </div>
+
+      <div className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-gray-400 transition-all duration-300 group-hover:border-white/20 group-hover:bg-white/[0.08] group-hover:text-white">
+        <Download className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />
+      </div>
+    </a>
   );
 }
