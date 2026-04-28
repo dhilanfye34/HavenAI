@@ -31,12 +31,28 @@ const PORT_INFO: Record<number, { protocol: string; desc: string }> = {
   5228: { protocol: 'GCM',        desc: 'Google push notifications' },
   5222: { protocol: 'XMPP',       desc: 'Messaging' },
   5223: { protocol: 'XMPP-TLS',   desc: 'Messaging (encrypted)' },
+  5432: { protocol: 'PostgreSQL',  desc: 'Database connection' },
   8443: { protocol: 'HTTPS-ALT',  desc: 'Encrypted web (alt port)' },
+};
+
+const SUSPICIOUS_PORTS: Record<number, string> = {
+  4444:  'Commonly used by Metasploit and other exploit tools',
+  5555:  'Known backdoor port used by malware',
+  6666:  'Known backdoor port used by malware',
+  6667:  'IRC — commonly used for botnet command & control',
+  31337: 'Elite/leet port — associated with hacking tools',
+  12345: 'NetBus trojan port',
+  27374: 'SubSeven trojan port',
 };
 
 function getProtocolInfo(port?: number): { protocol: string; desc: string } {
   if (!port) return { protocol: '', desc: '' };
+  if (SUSPICIOUS_PORTS[port]) return { protocol: `Port ${port}`, desc: SUSPICIOUS_PORTS[port] };
   return PORT_INFO[port] || { protocol: `Port ${port}`, desc: '' };
+}
+
+function isSuspiciousPort(port?: number): boolean {
+  return Boolean(port && SUSPICIOUS_PORTS[port]);
 }
 
 // ── Extract root domain from hostname ──
@@ -350,8 +366,16 @@ export default function NetworkPage() {
   const safe = [...verified, ...connections.filter((c) => c.status === 'safe')];
   const totalConnections = metrics?.network_connection_count || connections.length;
 
-  const askAboutConnection = (app: string, destination: string) => {
-    chatSendMessage(`Tell me about this network connection: "${app}" is connecting to "${destination}". Is this safe? Should I be concerned?`);
+  const askAboutConnection = (msg: string) => {
+    chatSendMessage(msg);
+  };
+
+  const buildAskMessage = (conn: ConnectionInfo): string => {
+    const portWarning = conn.port && SUSPICIOUS_PORTS[conn.port]
+      ? ` on port ${conn.port} (${SUSPICIOUS_PORTS[conn.port]})`
+      : conn.port ? ` on port ${conn.port}` : '';
+    const appPart = conn.app ? `The app "${conn.app}"` : 'Something on my computer';
+    return `${appPart} is connecting to "${conn.destination}"${portWarning}. Is this safe? Should I be concerned?`;
   };
 
   return (
@@ -414,14 +438,23 @@ export default function NetworkPage() {
           <div className="space-y-2">
             {flagged.map((conn) => {
               const portInfo = getProtocolInfo(conn.port);
+              const suspicious = isSuspiciousPort(conn.port);
+              const borderClass = suspicious
+                ? 'border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-500/5'
+                : 'border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5';
               return (
-                <div key={conn.id} className="card border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5 p-4">
+                <div key={conn.id} className={`card ${borderClass} p-4`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-haven-text truncate">
                           {conn.service !== 'Unknown service' ? conn.service : conn.destination}
                         </p>
+                        {suspicious && (
+                          <span className="shrink-0 rounded-full bg-red-200 dark:bg-red-500/20 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:text-red-300">
+                            Suspicious port
+                          </span>
+                        )}
                         {conn.count > 1 && (
                           <span className="shrink-0 rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
                             {conn.count}×
@@ -443,7 +476,7 @@ export default function NetworkPage() {
                           <span className="flex items-center gap-1">
                             <Lock className="h-3 w-3" />
                             {portInfo.protocol}
-                            {portInfo.desc && <span className="hidden sm:inline text-haven-text-tertiary">· {portInfo.desc}</span>}
+                            {portInfo.desc && <span className={`hidden sm:inline ${suspicious ? 'text-red-500 dark:text-red-400' : 'text-haven-text-tertiary'}`}>· {portInfo.desc}</span>}
                           </span>
                         )}
                       </div>
@@ -451,7 +484,7 @@ export default function NetworkPage() {
                     <div className="flex items-center gap-1 shrink-0 mt-0.5">
                       <button
                         onClick={() => {
-                          askAboutConnection(conn.app || conn.service, conn.destination);
+                          askAboutConnection(buildAskMessage(conn));
                           navigate('/dashboard/chat');
                         }}
                         className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-haven-text-secondary transition hover:text-blue-500 hover:border-blue-500"
@@ -527,7 +560,7 @@ export default function NetworkPage() {
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => {
-                        askAboutConnection(conn.service || conn.app, conn.destination);
+                        askAboutConnection(buildAskMessage(conn));
                         navigate('/dashboard/chat');
                       }}
                       className="p-1.5 text-haven-text-tertiary transition hover:text-blue-500"

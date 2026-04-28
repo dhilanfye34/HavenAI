@@ -25,10 +25,16 @@ export default function FilesPage() {
   const hasLiveData = Boolean(details?.file.recent_events?.length);
 
   const recentEvents = useMemo(() => {
-    return (details?.file.recent_events || [])
+    const events = (details?.file.recent_events || [])
       .slice()
-      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-      .slice(0, 20);
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    const seen = new Set<string>();
+    return events.filter((e) => {
+      const key = e.path || e.filename || '';
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 20);
   }, [details]);
 
   const allFileAlerts = alerts.filter(

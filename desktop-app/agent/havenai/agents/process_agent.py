@@ -40,19 +40,79 @@ if sys.platform == 'darwin':
         'dscl',            # Directory service — user/group manipulation
     }
     SYSTEM_PROCESSES = {
+        # Kernel & init
         'kernel_task', 'launchd', 'WindowServer', 'loginwindow',
-        'systemstats', 'syslogd', 'configd', 'opendirectoryd',
+        # Logging & stats
+        'systemstats', 'syslogd', 'logd', 'diagnosticd', 'analyticsd',
+        'symptomsd', 'ReportCrash', 'spindump', 'sysdiagnose',
+        # Directory & config
+        'configd', 'opendirectoryd', 'cfprefsd', 'containermanagerd',
+        # Spotlight & metadata
         'mds', 'mds_stores', 'mdworker', 'mdworker_shared',
-        'fseventsd', 'coreaudiod', 'coreservicesd',
-        'trustd', 'securityd', 'diskarbitrationd',
-        'bluetoothd', 'airportd', 'wifid',
-        'symptomsd', 'timed', 'powerd', 'thermalmonitord',
-        'notifyd', 'usbd', 'ioupsd', 'distnoted',
-        'UserEventAgent', 'cfprefsd', 'containermanagerd',
-        'logd', 'watchdogd', 'routined', 'dasd',
-        'rapportd', 'sharingd', 'cloudd',
-        'Finder', 'Dock', 'SystemUIServer', 'Spotlight',
         'corespotlightd', 'lsd', 'iconservicesagent',
+        # File system
+        'fseventsd', 'diskarbitrationd', 'fsck_apfs', 'revisiond',
+        # Security & auth
+        'trustd', 'securityd', 'endpointsecurityd', 'keybagd',
+        # Audio & media
+        'coreaudiod', 'audioaccessoryd', 'mediaremoted', 'mediaanalysisd',
+        # Networking
+        'bluetoothd', 'airportd', 'wifid', 'rapportd', 'sharingd',
+        'networkserviceproxy', 'mDNSResponder', 'WiFiAgent',
+        # Power & thermal
+        'timed', 'powerd', 'thermalmonitord', 'coreduetd',
+        # Notifications & IPC
+        'notifyd', 'usbd', 'ioupsd', 'distnoted',
+        'UserEventAgent', 'watchdogd',
+        # Scheduling & intelligence
+        'routined', 'dasd', 'duetexpertd', 'knowledgeconstructiond',
+        'biabortagent', 'BiomeAgent', 'chronod', 'remoted',
+        # Cloud & sync
+        'cloudd', 'nsurlsessiond', 'CloudTelemetryService',
+        'bird', 'secd', 'cloudpaird', 'cloudphotod',
+        # UI & desktop
+        'Finder', 'Dock', 'SystemUIServer', 'Spotlight',
+        'ControlCenter', 'WindowManager', 'NotificationCenter',
+        'universalaccessd', 'UniversalControl', 'AirPlayUIAgent',
+        'Siri', 'SiriNCService', 'assistantd', 'siriknowledged',
+        # Fonts & text
+        'fontd', 'fontworker',
+        # Extensions & frameworks
+        'extensionkitservice', 'pluginkit', 'pkd', 'appstoreagent',
+        'softwareupdated', 'storeaccountd', 'storekitagent',
+        # Contacts & calendar
+        'contactsd', 'contactsdonationagent', 'CalendarAgent',
+        'AddressBookSourceSync', 'callservicesd',
+        # Other system daemons
+        'coreservicesd', 'sandboxd', 'syspolicyd', 'taskgated',
+        'AMPDeviceDiscoveryAgent', 'amsaccountsd', 'amsengagementd',
+        'contextstored', 'CategoriesService', 'translationd',
+        'CommCenter', 'apsd', 'identityservicesd', 'imagent',
+        'IMDPersistenceAgent', 'IMTransferAgent',
+        'TCCd', 'TCC',
+        # Continuity & Sidecar
+        'SidecarRelay', 'ContinuityCaptureAgent', 'continuityd',
+        # Intents
+        'intents_helper', 'intentsd',
+        # News
+        'NewsToday2',
+        # Display & misc daemons
+        'dmd',
+        # WebKit & UI helpers
+        'com.apple.WebKit.WebContent', 'ViewBridgeAuxiliary',
+        'TextInputMenuAgent', 'NSAttributedStringAgent',
+        'QuickLookUIService',
+        # Software update
+        'SoftwareUpdateNotificationManager',
+        # Proactive intelligence
+        'proactived', 'promotedcontentd', 'ContextStoreAgent',
+        # WiFi & network agents
+        'WiFiAgent', 'linkd',
+        # User events
+        'UserEventAgent',
+        # Screen time, bluetooth, diagnostics
+        'ScreenTimeWidgetExtension', 'bluetoothuserd',
+        'diagnostics_agent', 'diagnosticd',
     }
 else:
     # Windows / fallback

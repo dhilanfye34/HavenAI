@@ -399,7 +399,7 @@ export default function SettingsPage() {
               Take the walkthrough again
             </button>
             <p className="mt-1 pl-1 text-xs text-haven-text-tertiary">
-              Replays the intro tour. You\u2019ll land back on Home when you finish.
+              Replays the intro tour. You'll land back on Home when you finish.
             </p>
           </div>
         </SectionCard>

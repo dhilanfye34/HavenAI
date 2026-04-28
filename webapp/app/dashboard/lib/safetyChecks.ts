@@ -2,32 +2,98 @@
 // Used across the dashboard to decide whether to flag an item as suspicious.
 
 export const KNOWN_SAFE_FRAGMENTS = [
+  // macOS core UI
   'finder', 'dock', 'systemuiserver', 'loginwindow', 'windowserver',
-  'launchd', 'kernel_task', 'spotlight', 'mds',
-  'coreaudiod', 'bluetoothd', 'airportd', 'configd', 'distnoted',
+  'controlcenter', 'windowmanager', 'notificationcenter',
+  'universalcontrol', 'universalaccess', 'airplayuiagent',
+  // macOS kernel & init
+  'launchd', 'kernel_task', 'spotlight',
+  // Spotlight & metadata
+  'mds', 'mds_stores', 'mdworker', 'corespotlightd',
+  // Audio & media
+  'coreaudiod', 'audioaccessoryd', 'mediaremoted', 'mediaanalysisd',
+  // Networking
+  'bluetoothd', 'airportd', 'configd', 'distnoted',
+  'wifid', 'apsd', 'identityservices', 'networkserviceproxy',
+  'mDNSResponder', 'WiFiAgent', 'rapportd', 'sharingd',
+  // Power, time, scheduling
+  'timed', 'powerd', 'thermald', 'thermalmonitord', 'coreduetd',
+  'dasd', 'routined', 'duetexpertd', 'chronod',
+  // Logging, diagnostics, crash reporting
+  'logd', 'syslogd', 'diagnosticd', 'analyticsd', 'symptomsd',
+  'reportcrash', 'spindump',
+  // Security & auth
+  'trustd', 'securityd', 'endpointsecurity', 'syspolicyd',
+  'amfid', 'keybagd', 'tccd', 'sandboxd', 'taskgated',
+  // Cloud & sync
+  'bird', 'cloudd', 'nsurlsessiond', 'cloudtelemetryservice',
+  'cloudpaird', 'cloudphotod', 'secd',
+  // Contacts, calendar, comms
+  'contactsd', 'contactsdonationagent', 'calendaragent',
+  'addressbooksourcesync', 'callservicesd', 'commcenter',
+  'imagent', 'imdpersistenceagent', 'imtransferagent',
+  // Intelligence & biome
+  'biomeagent', 'knowledgeconstructiond', 'contextstored',
+  'categoriesservice', 'translationd',
+  // Siri & assistant
+  'assistantd', 'siri', 'siriknowledged', 'suggestd',
+  // Config & prefs
+  'cfprefsd', 'opendirectoryd', 'containermanagerd',
+  // Fonts & extensions
+  'fontd', 'fontworker', 'extensionkitservice', 'pluginkit', 'pkd',
+  // App Store & updates
+  'appstoreagent', 'softwareupdated', 'storeaccountd', 'storekitagent',
+  'amsaccountsd', 'amsengagementd', 'ampdevicediscoveryagent',
+  // File system
+  'fseventsd', 'diskarbitrationd', 'revisiond',
+  // Continuity & Sidecar
+  'sidecarrelay', 'continuitycaptureagent', 'continuityd',
+  // Intents & Siri shortcuts
+  'intents_', 'intentsd', 'sabortagent',
+  // News & widgets
+  'newstoday', 'newstoday2',
+  // WebKit & UI helpers
+  'com.apple.webkit', 'webkit', 'webcontentprocess',
+  'viewbridgeauxiliary', 'textinputmenuagent', 'textinputmenu',
+  'nsattributedstringagent', 'quicklookuiservice',
+  // Software update
+  'softwareupdatenotificationmanager', 'softwareupdate',
+  // Proactive intelligence
+  'proactived', 'promotedcontentd', 'contextstoreagent',
+  // User events
+  'usereventagent',
+  // WiFi
+  'wifiagent',
+  // Linking & misc
+  'linkd', 'keychainaccess', 'securityagent',
+  // Other system
+  'usernoted', 'coreservices', 'coreservicesd',
+  'iconservices', 'lsd', 'corebrightness',
+  'watchdogd', 'axvisual', 'voiceover',
+  'backupd', 'remoted', 'dmd',
+  'openwith', 'applepushserviced', 'trustdfilehelper',
+  'com.apple.appkit', 'openandsavepanelservice',
+  'screentimewidget', 'bluetoothuserd', 'diagnostics_agent',
+  // Browsers
   'chrome', 'google chrome', 'safari', 'firefox', 'arc', 'brave',
+  // Communication apps
   'slack', 'discord', 'zoom', 'microsoft teams', 'teams',
+  // Dev tools
   'code', 'visual studio code', 'cursor',
   'iterm', 'terminal', 'warp', 'alacritty',
-  'spotify', 'music', 'apple music',
+  'docker', 'node', 'python', 'ruby', 'java', 'go',
+  // Productivity
+  'figma', 'notion', 'obsidian', 'linear',
   'notes', 'reminders', 'calendar', 'mail',
   'messages', 'facetime', 'photos',
   'preview', 'textedit', 'pages', 'numbers', 'keynote',
   'activity monitor', 'system preferences', 'system settings',
-  'figma', 'notion', 'obsidian', 'linear',
-  'docker', 'node', 'python', 'ruby', 'java', 'go',
-  'electron', 'havenai', 'haven',
+  // Media
+  'spotify', 'music', 'apple music',
+  // Widgets
   'stocks', 'stockswidget', 'weather', 'weatherwidget',
-  'notificationcenter', 'usernoted', 'coreservices',
-  'cfprefsd', 'nsurlsessiond', 'trustd', 'opendirectoryd',
-  'logd', 'syslogd', 'sharingd', 'rapportd',
-  'bird', 'cloudd', 'assistantd', 'siri', 'suggestd',
-  'backupd', 'timed', 'powerd', 'thermald',
-  'amfid', 'endpointsecurity', 'syspolicyd',
-  'axvisual', 'universalaccess', 'voiceover',
-  'iconservices', 'lsd', 'corebrightness',
-  'watchdogd', 'symptomsd', 'networkserviceproxy',
-  'wifid', 'apsd', 'identityservices',
+  // HavenAI
+  'electron', 'havenai', 'haven',
 ];
 
 export function isKnownSafe(name: string): boolean {

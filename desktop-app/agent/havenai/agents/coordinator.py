@@ -617,14 +617,18 @@ class Coordinator:
 
         top_processes: List[Dict[str, Any]] = []
         if psutil and process_running:
+            from .process_agent import SYSTEM_PROCESSES
             try:
                 for proc in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent", "status"]):
                     try:
                         info = proc.info
+                        name = info.get("name") or "unknown"
+                        if name in SYSTEM_PROCESSES or name == "unknown":
+                            continue
                         top_processes.append(
                             {
                                 "pid": info.get("pid"),
-                                "name": info.get("name") or "unknown",
+                                "name": name,
                                 "cpu_percent": float(info.get("cpu_percent") or 0.0),
                                 "memory_percent": float(info.get("memory_percent") or 0.0),
                                 "status": info.get("status") or "unknown",
@@ -654,7 +658,7 @@ class Coordinator:
                 "active_processes": list(process_ctx.get("active_processes", []) or [])[:40]
                 if process_running
                 else [],
-                "top_processes": top_processes[:12],
+                "top_processes": top_processes[:120],
             },
             "network": {
                 "event_count": int(network_ctx.get("total_new_connections", 0) or 0)
