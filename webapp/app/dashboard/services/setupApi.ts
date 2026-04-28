@@ -3,8 +3,7 @@ import {
   SetupPreferences,
   SetupPreferencesUpdate,
 } from '../types';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { apiUrl } from '../../lib/apiConfig';
 
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
@@ -42,7 +41,7 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
 
   try {
-    const response = await fetch(`${API_URL}/auth/refresh`, {
+    const response = await fetch(apiUrl('/auth/refresh'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),
@@ -115,7 +114,7 @@ export interface DeviceInfo {
 }
 
 export async function listDevices(token: string): Promise<DeviceInfo[]> {
-  const response = await fetchWithAuth(`${API_URL}/devices`, token);
+  const response = await fetchWithAuth(apiUrl('/devices'), token);
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, 'Failed to fetch devices.'));
   }
@@ -123,7 +122,7 @@ export async function listDevices(token: string): Promise<DeviceInfo[]> {
 }
 
 export async function unlinkDevice(token: string, deviceId: string): Promise<void> {
-  const response = await fetchWithAuth(`${API_URL}/devices/${deviceId}/unlink`, token, {
+  const response = await fetchWithAuth(apiUrl(`/devices/${deviceId}/unlink`), token, {
     method: 'POST',
   });
   if (!response.ok) {
@@ -132,7 +131,7 @@ export async function unlinkDevice(token: string, deviceId: string): Promise<voi
 }
 
 export async function getProtectionStatus(token: string): Promise<ProtectionStatus> {
-  const response = await fetchWithAuth(`${API_URL}/devices/status`, token);
+  const response = await fetchWithAuth(apiUrl('/devices/status'), token);
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, 'Failed to fetch device protection status.'));
   }
@@ -140,7 +139,7 @@ export async function getProtectionStatus(token: string): Promise<ProtectionStat
 }
 
 export async function getSetupPreferences(token: string): Promise<SetupPreferences> {
-  const response = await fetchWithAuth(`${API_URL}/setup/preferences`, token);
+  const response = await fetchWithAuth(apiUrl('/setup/preferences'), token);
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, 'Failed to fetch setup preferences.'));
   }
@@ -151,7 +150,7 @@ export async function updateSetupPreferences(
   token: string,
   payload: SetupPreferencesUpdate,
 ): Promise<SetupPreferences> {
-  const response = await fetchWithAuth(`${API_URL}/setup/preferences`, token, {
+  const response = await fetchWithAuth(apiUrl('/setup/preferences'), token, {
     method: 'PUT',
     body: JSON.stringify(payload),
   });

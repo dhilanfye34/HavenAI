@@ -1,6 +1,5 @@
 import { ChatContextEvent, ChatMessage } from '../types';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { apiUrl } from '../../lib/apiConfig';
 
 interface StreamChatParams {
   token: string;
@@ -21,7 +20,7 @@ export async function streamChatCompletion({
   onToken,
   onDone,
 }: StreamChatParams): Promise<void> {
-  const response = await fetch(`${API_URL}/chat/stream`, {
+  const response = await fetch(apiUrl('/chat/stream'), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -90,7 +89,7 @@ export async function listConversations(
   token: string,
   limit: number = 20,
 ): Promise<ConversationSummary[]> {
-  const response = await fetch(`${API_URL}/chat/conversations?limit=${limit}`, {
+  const response = await fetch(apiUrl(`/chat/conversations?limit=${limit}`), {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) return [];

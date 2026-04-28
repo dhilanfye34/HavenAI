@@ -11,6 +11,7 @@ import {
   Wifi,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { getPlatformCopy, type PlatformCopy } from '../lib/platformCopy';
 
 /**
  * The SETUP step runs right after the walkthrough for a brand-new account.
@@ -37,30 +38,28 @@ interface StepBase {
   description: string;
 }
 
-const STEPS: StepBase[] = [
+function buildSteps(platformCopy: PlatformCopy): StepBase[] {
+  return [
   {
     id: 'file',
     icon: FileSearch,
     headline: 'Watch your files',
     subhead: 'HavenAI can spot unusual writes and bulk edits.',
-    description:
-      'macOS needs Full Disk Access to let HavenAI see activity inside Desktop and Downloads. Grant it in System Settings and we\u2019ll pick it up automatically.',
+    description: platformCopy.setupDescriptions.file,
   },
   {
     id: 'process',
     icon: Eye,
     headline: 'Watch your apps',
     subhead: 'Unknown processes are one of the biggest red flags.',
-    description:
-      'HavenAI lists running apps and flags suspicious spawns. This usually works without extra permissions, but the re-check below will confirm.',
+    description: platformCopy.setupDescriptions.process,
   },
   {
     id: 'network',
     icon: Wifi,
     headline: 'Watch your network',
     subhead: 'Catches outbound connections to unfamiliar hosts.',
-    description:
-      'Full Disk Access helps here too — without it, macOS hides the process-to-socket mapping. You\u2019ll still get most signals even if this stays limited.',
+    description: platformCopy.setupDescriptions.network,
   },
   {
     id: 'email',
@@ -70,7 +69,8 @@ const STEPS: StepBase[] = [
     description:
       'Gmail, iCloud, Yahoo, and Outlook are supported. Skip this one if you\u2019d rather set it up later from the Email tab.',
   },
-];
+  ];
+}
 
 interface EmailProvider {
   name: string;
@@ -118,10 +118,16 @@ export default function SetupFlow({ onFinish, onSkip }: Props) {
   const [appPassword, setAppPassword] = useState('');
   const [emailStatus, setEmailStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [emailMessage, setEmailMessage] = useState('');
+  const [platformCopy, setPlatformCopy] = useState(() => getPlatformCopy('unknown'));
 
   const havenai = typeof window !== 'undefined' ? (window as any).havenai : null;
   const provider = useMemo(() => detectProvider(emailAddress), [emailAddress]);
-  const current = STEPS[step];
+  const steps = buildSteps(platformCopy);
+  const current = steps[step];
+
+  useEffect(() => {
+    setPlatformCopy(getPlatformCopy());
+  }, []);
 
   // Pull initial monitor state once.
   useEffect(() => {
@@ -232,7 +238,7 @@ export default function SetupFlow({ onFinish, onSkip }: Props) {
   }, [havenai, emailAddress, appPassword, provider]);
 
   const goNext = () => {
-    if (step < STEPS.length - 1) setStep(step + 1);
+    if (step < steps.length - 1) setStep(step + 1);
     else onFinish();
   };
 
@@ -248,7 +254,7 @@ export default function SetupFlow({ onFinish, onSkip }: Props) {
     <div className="flex min-h-screen items-center justify-center bg-haven-bg px-4 py-12">
       <div className="w-full max-w-xl">
         <div className="mb-8 flex items-center justify-center gap-2">
-          {STEPS.map((_, i) => (
+          {steps.map((_, i) => (
             <div
               key={i}
               className={`h-2 rounded-full transition-all duration-300 ${
@@ -289,7 +295,9 @@ export default function SetupFlow({ onFinish, onSkip }: Props) {
                   disabled={recheckingModule === current.id}
                   className="flex-1 rounded-lg border border-amber-400/30 bg-amber-500/[0.08] px-3 py-2 text-xs font-medium text-amber-300 transition hover:bg-amber-500/[0.14] disabled:opacity-60"
                 >
-                  {openedFor[current.id] ? 'Open privacy settings again' : '1. Open privacy settings'}
+                  {openedFor[current.id]
+                    ? `Open ${platformCopy.permissionSettingsName} again`
+                    : `1. Open ${platformCopy.permissionSettingsName}`}
                 </button>
                 <button
                   type="button"
@@ -316,7 +324,7 @@ export default function SetupFlow({ onFinish, onSkip }: Props) {
               )}
               {recheckResult[current.id as MonitorModule] === 'still-blocked' && (
                 <p className="text-[11px] text-amber-300/90">
-                  {'Still blocked. In Privacy & Security \u2192 Full Disk Access, make sure HavenAI is toggled on. macOS sometimes needs a moment to apply it.'}
+                  {platformCopy.stillBlockedMessage}
                 </p>
               )}
               {recheckResult[current.id as MonitorModule] === 'error' && (
@@ -393,14 +401,14 @@ export default function SetupFlow({ onFinish, onSkip }: Props) {
               Skip setup for now
             </button>
             <button onClick={goNext} className="btn-primary">
-              {step === STEPS.length - 1 ? 'Finish setup' : 'Continue'}
+              {step === steps.length - 1 ? 'Finish setup' : 'Continue'}
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
 
         <p className="mt-6 text-center text-xs text-haven-text-tertiary">
-          {`Step ${step + 1} of ${STEPS.length} \u2014 you can change any of this later in Settings.`}
+          {`Step ${step + 1} of ${steps.length} \u2014 you can change any of this later in Settings.`}
         </p>
       </div>
     </div>

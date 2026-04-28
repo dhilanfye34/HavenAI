@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiUrl } from '../lib/apiConfig';
 
 /**
  * Root state machine for the HavenAI desktop app. See
@@ -38,8 +39,6 @@ export interface AppStateValue {
   replayOnboarding: () => void;
   dismissDeviceConflict: () => void;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 type Flags = {
   onboardedUsers: string[];
@@ -94,7 +93,7 @@ async function fetchMe(accessToken: string): Promise<{ ok: true; user: AppUser }
   try {
     const controller = new AbortController();
     const tid = setTimeout(() => controller.abort(), 4_000);
-    const res = await fetch(`${API_URL}/auth/me`, {
+    const res = await fetch(apiUrl('/auth/me'), {
       headers: { Authorization: `Bearer ${accessToken}` },
       signal: controller.signal,
     });
@@ -111,7 +110,7 @@ async function fetchMe(accessToken: string): Promise<{ ok: true; user: AppUser }
 
 async function tryRefresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string } | null> {
   try {
-    const res = await fetch(`${API_URL}/auth/refresh`, {
+    const res = await fetch(apiUrl('/auth/refresh'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),

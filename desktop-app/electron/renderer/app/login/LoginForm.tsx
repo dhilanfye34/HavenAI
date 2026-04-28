@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import ShieldLock from '../components/ShieldLock';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { apiUrl } from '../lib/apiConfig';
 
 export interface LoginFormProps {
   onLoginSuccess?: () => void;
@@ -31,7 +30,7 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps = {}) {
       const endpoint = isLogin ? '/auth/login' : '/auth/register';
       const body = isLogin ? { email, password } : { email, password, full_name: fullName };
 
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetch(apiUrl(endpoint), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -80,7 +79,11 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps = {}) {
 
       onLoginSuccess?.();
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch');
+      setError(
+        err instanceof TypeError
+          ? 'Cannot reach HavenAI backend. Check your internet connection and try again.'
+          : err.message || 'Failed to fetch',
+      );
     } finally {
       setLoading(false);
     }

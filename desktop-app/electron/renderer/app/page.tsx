@@ -25,6 +25,7 @@ import DeviceConflictScreen from './login/DeviceConflictScreen';
 import DashboardPage from './dashboard/page';
 import SetupFlow from './setup/SetupFlow';
 import { useAppState } from './hooks/useAppState';
+import { getPlatformCopy, type PlatformCopy } from './lib/platformCopy';
 
 // ── Onboarding (inline — no router needed) ──
 
@@ -39,7 +40,8 @@ type OnboardingStep = {
   bullets?: { icon: LucideIcon; text: string }[];
 };
 
-const ONBOARDING_STEPS: OnboardingStep[] = [
+function buildOnboardingSteps(platformCopy: PlatformCopy): OnboardingStep[] {
+  return [
   {
     id: 'welcome',
     headline: 'Meet HavenAI',
@@ -79,7 +81,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     description:
       'Every scan, score, and decision happens on your computer. Your files, email contents, browsing history, and app activity are analyzed inside HavenAI \u2014 the cloud never sees them.',
     bullets: [
-      { icon: Lock, text: 'Email passwords stored in your OS keychain (macOS Keychain / Windows DPAPI), never in plaintext.' },
+      { icon: Lock, text: `Email passwords are stored in ${platformCopy.secureStorageName}, never in plaintext.` },
       { icon: Network, text: 'Only the alerts you generate are synced to the cloud, and only so you can see them here.' },
       { icon: ShieldLock as unknown as LucideIcon, text: 'No telemetry, no analytics, no ad tracking \u2014 ever.' },
     ],
@@ -111,14 +113,21 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     ],
     visual: CheckCircle2,
   },
-];
+  ];
+}
 
 function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
-  const current = ONBOARDING_STEPS[step];
+  const [platformCopy, setPlatformCopy] = useState(() => getPlatformCopy('unknown'));
+  const onboardingSteps = buildOnboardingSteps(platformCopy);
+  const current = onboardingSteps[step];
+
+  useEffect(() => {
+    setPlatformCopy(getPlatformCopy());
+  }, []);
 
   const next = () => {
-    if (step < ONBOARDING_STEPS.length - 1) {
+    if (step < onboardingSteps.length - 1) {
       setStep(step + 1);
     } else {
       onComplete();
@@ -133,7 +142,7 @@ function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
     <div className="flex min-h-screen items-center justify-center bg-haven-bg px-4 py-12">
       <div className="w-full max-w-xl">
         <div className="mb-8 flex items-center justify-center gap-2">
-          {ONBOARDING_STEPS.map((_, i) => (
+          {onboardingSteps.map((_, i) => (
             <div
               key={i}
               className={`h-2 rounded-full transition-all duration-300 ${
@@ -198,10 +207,10 @@ function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
 
           <div className="mt-8 space-y-3">
             <button onClick={next} className="btn-primary w-full">
-              {step === ONBOARDING_STEPS.length - 1 ? 'Get Started' : 'Continue'}
+              {step === onboardingSteps.length - 1 ? 'Get Started' : 'Continue'}
               <ArrowRight className="h-4 w-4" />
             </button>
-            {step < ONBOARDING_STEPS.length - 1 && (
+            {step < onboardingSteps.length - 1 && (
               <button onClick={skip} className="w-full text-sm text-haven-text-tertiary transition hover:text-haven-text">
                 Skip intro
               </button>
@@ -210,7 +219,7 @@ function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
         </div>
 
         <p className="mt-6 text-center text-xs text-haven-text-tertiary">
-          Step {step + 1} of {ONBOARDING_STEPS.length}
+          Step {step + 1} of {onboardingSteps.length}
         </p>
       </div>
     </div>
